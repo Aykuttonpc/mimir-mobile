@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item android:id="@+id/add_post" android:title="Add post"
+        ></item>
+    <item android:id="@+id/signout" android:title="Signout"
+        ></item>
+    <item android:id="@+id/direct_message" android:title="dm"
+        ></item>
+
+
+        
+
+</menu>
