@@ -12,6 +12,8 @@ import androidx.compose.runtime.setValue
  */
 sealed interface Screen {
     data object Login : Screen
+    data object Register : Screen
+    data class EmailSent(val email: String) : Screen
     data class Pending(val username: String) : Screen
     data class Home(val username: String, val isAdmin: Boolean) : Screen
 }
@@ -27,16 +29,27 @@ fun MimirApp() {
             },
             onAccountPending = { username ->
                 screen = Screen.Pending(username)
-            }
+            },
+            onGoToRegister = { screen = Screen.Register },
+        )
+        is Screen.Register -> RegisterScreen(
+            onRegistered = { email ->
+                screen = Screen.EmailSent(email)
+            },
+            onBackToLogin = { screen = Screen.Login },
+        )
+        is Screen.EmailSent -> EmailSentScreen(
+            email = s.email,
+            onBackToLogin = { screen = Screen.Login },
         )
         is Screen.Pending -> PendingScreen(
             username = s.username,
-            onBack = { screen = Screen.Login }
+            onBack = { screen = Screen.Login },
         )
         is Screen.Home -> HomeScreen(
             username = s.username,
             isAdmin = s.isAdmin,
-            onLogout = { screen = Screen.Login }
+            onLogout = { screen = Screen.Login },
         )
     }
 }

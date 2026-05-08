@@ -13,6 +13,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,6 +37,7 @@ import kotlinx.coroutines.launch
 fun LoginScreen(
     onLoggedIn: (AuthResponse) -> Unit,
     onAccountPending: (username: String) -> Unit,
+    onGoToRegister: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val api = remember { MimirApi() }
@@ -134,10 +136,8 @@ fun LoginScreen(
         }
 
         Spacer(Modifier.height(12.dp))
-        Text(
-            text = "Mimir kapalı bir ağdır. Davet linki yoksa kayıt yapamazsın.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        TextButton(onClick = onGoToRegister, enabled = !loading) {
+            Text("Davet token'ım var, kayıt ol")
+        }
     }
 }
