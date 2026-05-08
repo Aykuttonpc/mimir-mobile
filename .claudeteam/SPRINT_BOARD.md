@@ -39,7 +39,6 @@
 
 | ID | Başlık | Sahip | Tahmin | Notlar |
 |---|---|---|---|---|
-| T-018 | nginx `/mimir/` patch'in AykutOnPC repo'sunda kalıcılaştırılması | DevOps + Tech Lead | 30 dk | **KRİTİK**: `D:\Projeler\Voxi\AykutOnPC\nginx\conf.d\aykutonpc.conf`'a /mimir/ location bloğu commit + push. Aksi halde her AykutOnPC deploy'unda silinir. |
 | T-011 | KMP + Compose Multiplatform iskelet proje (**Android-only**) | Senior Dev #3 + Innovation Architect | 1-2 gün | Yeni branch `kmp-rewrite`. Login screen iskeleti, JWT storage, OkHttp + Retrofit (KMP) ile mimir-api bağlantısı |
 | T-019 | Eski Java/Firebase Android kodu temizliği | Senior Dev #3 | 0.5 gün | Mevcut JavaInstagramClone repo'sundaki Firebase/Picasso/Java kod silinir. Repo `instaclone-mobile` (sonra `mimir-mobile`)'a rename |
 | T-022 | Login + Pending screen + Approve flow UI | Senior Dev #3 | 1-2 gün | Davet token entry → register → email verify (manual link tıklama) → "admin onayı bekleniyor" → login → home |
@@ -79,6 +78,7 @@
 | T-009 | 3-aşama onboarding endpoint'leri | 2026-05-09 | 8 endpoint çalışıyor: register/verify-email/login/refresh/logout + admin invitations/users-pending/approve. End-to-end smoke test başarılı. RBAC (admin policy) çalışıyor. JWT access + refresh rotation + reuse detection. |
 | T-014 | Rate limit (in-memory fixed window) | 2026-05-09 | 4 policy: auth-register (5/dk), auth-login (10/dk), auth-verify (30/dk), admin-invite (20/dk). Smoke test'te 10. login fail'de 429 döndü ✅ (ADR-011). |
 | T-Hardening | Sprint #2 hardening: SmtpEmailSender + DataProtection-Keys volume + compose service rename + ForwardedHeaders | 2026-05-09 | Ek paket MailKit 4.16.0 (vulnerability fix), DP-Keys volume + Dockerfile chown, service `web`→`api` (alias fix), Docker subnetleri ForwardedHeaders trust |
+| T-018 | nginx `/mimir/` patch'in AykutOnPC repo'sunda kalıcılaştırılması | 2026-05-09 | AykutOnPC commit `7c58362` (`feat(nginx): /mimir/ location...`), GitHub Actions auto-deploy ~2 dk içinde uyguladı. Artık her deploy'da git tracked, silinmez. /mimir/health 200 + AykutOnPC root 200 (ikisi de stabil). |
 
 ---
 
@@ -99,6 +99,6 @@
 
 ## Bloklayıcılar (Sprint #3)
 
-- **T-018 BLOCKING T-022**: nginx /mimir/ patch kalıcı olmazsa, AykutOnPC her deploy'da mobile auth'u kırar. Mobile UI iş başlamadan önce halledilmeli.
+- ~~**T-018 BLOCKING T-022**~~ → **çözüldü 2026-05-09**: AykutOnPC repo'sunda kalıcı.
 - **T-022 → T-011 + T-019**: UI öncesi KMP iskelet ve eski kod temizliği.
 - iOS toolchain (Sprint #6 öncesi): macOS erişimi netleşmemiş — kullanıcıdan teyit alınacak.
