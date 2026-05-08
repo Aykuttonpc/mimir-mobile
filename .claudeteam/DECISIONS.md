@@ -1,0 +1,389 @@
+# Decisions Log (ADR-Style)
+
+> Her önemli teknik/ürün kararı buraya yazılır.
+> Format: tarih ↑ olacak şekilde, en yeni en üstte.
+> "Önemli" tanımı: 2 hafta sonra "neden böyle yaptık?" sorusunu doğurabilecek her şey.
+
+---
+
+## Şablon
+
+```
+### ADR-NNN — [Karar başlığı]
+
+- **Tarih:** YYYY-MM-DD
+- **Durum:** Önerildi / Kabul edildi / Geri çekildi / Yerine geçen ADR-XXX
+- **Karar verenler:** [Roller / kişiler]
+
+**Bağlam:**
+[Neden karar gerekiyordu? Hangi problem?]
+
+**Değerlendirilen Seçenekler:**
+1. [Seçenek A] — [artısı/eksisi]
+2. [Seçenek B] — [artısı/eksisi]
+
+**Karar:**
+[Hangisi seçildi]
+
+**Rationale:**
+[Neden bu seçildi]
+
+**Sonuçlar / Trade-off'lar:**
+[Bu kararın yan etkileri, kabul ettiğimiz dezavantajlar]
+```
+
+---
+
+## ADR-011 — Rate Limit Stratejisi (in-memory fixed-window) + Compose Service Naming + Email Fallback
+
+- **Tarih:** 2026-05-09
+- **Durum:** Kabul edildi
+- **Karar verenler:** AppSec, DevOps, Tech Lead, Senior Dev #1
+
+**Bağlam (3 ayrı micro-karar tek ADR):**
+
+### 1) Rate Limit
+T-014: Brute-force / abuse / SMS bombing yerine artık email bombing korumasına ihtiyaç. Single-instance MVP'de Redis-distributed rate limiter overkill.
+
+**Karar:** ASP.NET Core 9 built-in `AddRateLimiter` (System.Threading.RateLimiting). IP-bazlı fixed window:
+- `auth-register`: 5/dk
+- `auth-login`: 10/dk
+- `auth-verify`: 30/dk
+- `admin-invite`: 20/dk
+
+**Forwarded headers:** Docker subnet'leri (172.16/12, 10/8) `KnownNetworks`'e eklendi → nginx X-Forwarded-For trust edilir, gerçek client IP rate-limit bucket'ında kullanılır.
+
+**Trade-off:** Multi-replica deployment olunca Redis-distributed'a taşınması gerekecek (token bucket Redis'te). Sprint backlog.
+
+### 2) Compose Service Naming
+`mimir compose`'da service ismi `web` → `api`. Sebep: AykutOnPC stack'i de `web` servisini kullanıyor; aynı `aykutonpc_frontend` external network'üne join olunca DNS alias çakışması (`web` ↔ random container) AykutOnPC'nin ana site routing'ini kırıyordu. `api` alias'ı çakışma yok. Container ismi `mimir-web` olarak kalır (DNS'te bu da alias).
+
+### 3) Email Sender Fallback
+SMTP gerçek implementasyonu (MailKit 4.16.0) yazıldı (`SmtpEmailSender`). DI'da koşullu register: `Smtp:Host` config'i set ise SMTP, yoksa `ConsoleEmailSender` (mock — log'a yazar).
+
+Sprint #3'te kullanıcı gerçek SMTP host set edince otomatik geçer.
+
+**Sonuçlar:**
+- (+) Brute-force koruması canlı (smoke test'te 10. denemede 429 döndü)
+- (+) AykutOnPC site etkilenmedi alias fix sonrası
+- (+) SMTP gerçek/mock fallback temiz pattern
+- (−) Rate limit single-instance scope — multi-replica gerek olunca Redis migration
+- ⚠️ **Kritik nginx /mimir/ patch SÜRDÜRÜLEMEZ** — AykutOnPC auto-deploy `git reset --hard` ile silebiliyor. Sprint #3'e "AykutOnPC repo'sunda kalıcılaştır" todo'su eklendi.
+
+---
+
+## ADR-010 — SMS Verification İptal — Onboarding 4-Aşamadan 3-Aşamaya İndirildi
+
+- **Tarih:** 2026-05-09
+- **Durum:** Kabul edildi
+- **Karar verenler:** Kullanıcı, PO, AppSec, SecOps, Senior Dev #2
+
+**Bağlam:**
+ADR yapımı sırasında 4-aşama gate (email verify + SMS OTP + admin onay) tasarlandı. SMS provider (Netgsm/Twilio/Vonage) seçimi T-010 brief'i olarak Sprint #2'ye eklendi.
+
+Kullanıcı uygulama maliyet analizi sonrası SMS gönderimi istemiyor: provider başına yıllık 50-200 TL + abuse koruması karmaşıklığı + KVKK telefon işleme yüzeyi.
+
+**Değerlendirilen Seçenekler:**
+1. SMS verify devam — provider seç, abuse koruması yaz, maliyet kabul et
+2. SMS verify iptal — Phone alanı tamamen kaldır
+3. SMS verify iptal — Phone alanı **opsiyonel** olarak kalsın (verify yok, bilgi-only)
+
+**Karar:**
+Seçenek 3 — SMS verify iptal, Phone alanı opsiyonel.
+
+**Rationale:**
+- Davet+admin onaylı kapalı network: SMS verification'ın sağladığı "telefon = kişi" güvencesi zaten admin'in tanıdığı süzgeciyle gerçekleşiyor. Çift kontrol gereksiz.
+- Maliyet ↓ (sıfır) + karmaşıklık ↓ (abuse koruması yok)
+- Phone field nullable kalır → admin tanıdığını phone'la eşleştirmek isterse veri toplanır. Data minimization açısından "opsiyonel + verify yok" KVKK uyumlu.
+- Email verify + admin manuel onayı, kapalı network için yeterli güvence.
+
+**Etkiler:**
+- `UserStatus` enum: `PendingSms` value kaldırıldı → 3 aşama (PendingEmail → PendingAdmin → Active)
+- `OtpCode` entity: `Type` kolonu kaldırıldı (sadece email kullanılıyor); `OtpType` enum silindi
+- `User.Phone`: nullable string (`Phone?`)
+- `appsettings.json`: `Sms` section silindi
+- `.env.prod` ve `docker-compose.prod.yml`: `SMS_PROVIDER`, `SMS_API_KEY` env'leri silindi
+- 3. EF migration: `DropSmsVerification` (Phone nullable + otp_codes.Type drop)
+- T-010 (SMS provider brief) → **iptal**, shelf
+- T-014: SMS bombing korumasıydı → email bombing korumasına dönüşür (rate limit hâlâ değerli)
+- TECH_RADAR: Netgsm, Twilio, Vonage (Assess) → kaldırıldı
+
+**Sonuçlar / Trade-off'lar:**
+- (+) Sıfır SMS maliyeti
+- (+) Sıfır abuse riski (SMS bombing yüzeyi yok)
+- (+) Daha basit onboarding flow, az kod
+- (−) Telefon-bazlı identity yok — admin'e bağlı güven
+- (−) Self-service şifre sıfırlama "SMS link" pattern'i mümkün değil → email-based reset Sprint #2 sonu öncesi yapılır
+- ⚠️ Future-proof: ileride opt-in 2FA (TOTP, WebAuthn) eklenebilir, ADR-010 supersede edilmez
+
+---
+
+## ADR-009 — Ürün Adı: InstaClone → Mimir
+
+- **Tarih:** 2026-05-09
+- **Durum:** Kabul edildi
+- **Karar verenler:** Kullanıcı, PO, Innovation Architect, Knowledge Curator
+
+**Bağlam:**
+"InstaClone" geçici kod adıydı (mobile repo `JavaInstagramClone`'dan miras). Üretim öncesi marka kararı: kullanıcı **mitolojik + anlamı kapalı** (sadece soranlar öğrenebilsin) bir ürün adı istedi.
+
+**Değerlendirilen Seçenekler:**
+1. Anadolu/Türk: Yada, Umay, Inara
+2. Dış: Mimir (Norse), Khepri (Mısır)
+
+**Karar:**
+**Mimir** (Norse mitolojisi).
+
+**Rationale:**
+- Bilgelik kuyusunun başı — sırların ve hafızanın koruyucusu, kendisine danışılır
+- Mesajlaşma + hafıza + güvenli iletişim metaforu doğal rezonans
+- Az bilinen (Marvel/Thor mitolojisinde geçmedi, mainstream değil) → "anlamı sadece soranlar öğrensin" kriterine uyar
+- Kısa (5 harf), URL-safe, telaffuzu net
+
+**Uygulanan Rename Etkileri:**
+- Repo: `instaclone-api` → `mimir-api` (https://github.com/Aykuttonpc/mimir-api, ilk push tamam)
+- VPS: `/opt/instaclone` → `/opt/mimir`
+- Container'lar: `instaclone-db/redis` → `mimir-db/redis` (yeniden ayağa, healthy)
+- Compose project name: `instaclone` → `mimir`
+- Volume'lar: `instaclone_*` → `mimir_*` (eski boş volume'lar silindi, sıfır veri kaybı)
+- Path prefix: `/insta/` → `/mimir/`
+- DB user + name: `instaclone` → `mimir`
+- JWT: `instaclone-api` / `instaclone-mobile` → `mimir-api` / `mimir-mobile`
+- Mobile repo (Sprint #3): `instaclone-mobile` → `mimir-mobile`
+- 7 `.claudeteam/` dökümanında string referansları güncellendi
+
+**Maliyet:**
+~30 dk. Yatırım küçükken (sadece deployment iskelet + boş DB) yapıldığı için ucuz. Erteleme ileride 10x pahalanırdı.
+
+---
+
+## ADR-008 — Repo Yapısı: Backend + Mobile Ayrı Repolar
+
+- **Tarih:** 2026-05-08
+- **Durum:** Kabul edildi
+- **Karar verenler:** Tech Lead, DevOps, PO
+
+**Bağlam:**
+Mevcut [JavaInstagramClone](https://github.com/Aykuttonpc/JavaInstagramClone.git) repo'su Android tarafı. Backend yeni — nereye gitsin?
+
+**Değerlendirilen Seçenekler:**
+1. Monorepo — backend/ klasörü mevcut repo'ya ekle
+2. Ayrı repo — `mimir-api` (backend) + mevcut repo (mobile, ileride `mimir-mobile`'a rename)
+
+**Karar:**
+Seçenek 2 — Ayrı repo.
+
+**Rationale:**
+Backend ve mobile farklı CI/CD hattı, farklı dil ekosistemi, farklı versiyon hızı. Backend daily deploy, mobile haftalık APK release. Monorepo CI workflow karmaşıklığı (path filter, conditional jobs) küçük takım için overhead.
+
+**Sonuçlar / Trade-off'lar:**
+- (+) CI/CD basit ve ayrı
+- (+) Versiyon hatları bağımsız
+- (+) `gh repo` görünümü temiz
+- (−) API contract değişiminde iki repo'da koordinasyon gerek (kabul — küçük scope)
+- ⚠️ Mevcut `JavaInstagramClone` repo'su ileride `mimir-mobile`'a rename edilecek (Sprint #3'te Java kodu temizlenince)
+
+---
+
+## ADR-007 — Mobile-Only MVP: Path Prefix Routing + Domain Deferred
+
+- **Tarih:** 2026-05-08
+- **Durum:** Kabul edildi (ADR-006'nın yerine geçer)
+- **Karar verenler:** DevOps, Tech Lead, AppSec, PO
+
+**Bağlam:**
+ADR-006'da subdomain `insta.aykutonpc.com` kararı verildi — ama bu **web client** varsayımıyla. Kullanıcı netleştirdi: v1 sadece mobil. Domain + Let's Encrypt + DNS işi mobile-only senaryoda gereksiz overhead.
+
+**Değerlendirilen Seçenekler:**
+1. Subdomain (ADR-006) — domain alımı + DNS + ayrı cert + nginx server block
+2. Path prefix — `https://178.104.198.249/mimir/` mevcut nginx + self-signed + mobile cert pinning
+3. Ayrı port — `https://178.104.198.249:9443` ayrı cert ayrı listen
+
+**Karar:**
+Seçenek 2 — Path prefix routing. Mevcut nginx'e `location /mimir/` bloğu eklenir, mimir-web:9001'e proxy.
+
+**Rationale:**
+- Mobil app TLS doğrulamasını **certificate pinning** ile yapar — browser uyarısı umurda değil
+- Mevcut bootstrap self-signed cert reuse → cert/domain işi sıfır
+- JWT Bearer token (cookie değil) → path prefix scope sorun yok
+- Domain ileride lazım olursa subdomain'e taşımak nginx config tek değişiklik
+
+**Sonuçlar / Trade-off'lar:**
+- (+) Domain alma + DNS + cert işi shelf — sprint hızı ↑
+- (+) Mevcut altyapı reuse, ek maliyet sıfır
+- (−) Cert rotation = APK rebuild + force update zorunlu (cert pinning gereği)
+- (−) Web client (v2 düşüncesi) için domain gerekecek — o zaman ADR yazılır
+- ⚠️ Mobil app'e cert public key fingerprint bundle'lanmalı (T-007 backlog)
+
+**ADR-006'nın Durumu:**
+ADR-006 "Yerine geçen ADR-007". Subdomain kararı domain alımı yapıldığında tekrar gündeme alınacak — ileri tarihte yeni ADR yazılır.
+
+---
+
+## ADR-006 — Subdomain `insta.aykutonpc.com` + Mevcut VPS'e Ek Proje Pattern'i
+
+- **Tarih:** 2026-05-08
+- **Durum:** ⚠️ Yerine geçen **ADR-007** (mobile-only context'te path prefix yeterli)
+- **Karar verenler:** SecOps, DevOps, Tech Lead, PO
+
+**Bağlam:**
+Hetzner CPX22 VPS hazır + üzerinde AykutOnPC adlı .NET 9 stack çalışıyor (Postgres, Redis, Nginx, %0.01 load, 3 GB free RAM). Mimir'u nereye/nasıl deploy edeceğiz?
+
+**Değerlendirilen Seçenekler:**
+1. Yeni VPS al — €4/ay ek maliyet, izolasyon ↑
+2. Mevcut VPS'e ek proje (path prefix `/mimir/`) — JWT auth path karışıklığı, nginx routing kompleks
+3. Mevcut VPS'e ek proje (subdomain `insta.aykutonpc.com`) — temiz routing, ayrı cert
+
+**Karar:**
+Seçenek 3 — VPS rehberindeki "Strateji A" pattern'i. `/opt/mimir` klasörü, kendi `docker-compose.prod.yml`, container `127.0.0.1:9001` (8080 mevcut), mem_limit 1GB, mevcut nginx'e yeni `server` bloğu, ayrı Let's Encrypt cert.
+
+**Rationale:**
+Mevcut VPS bol kaynaklı. İzolasyon container seviyesinde yeterli. Subdomain JWT cookie/CORS açısından temiz. Maliyet sıfır.
+
+**Sonuçlar / Trade-off'lar:**
+- (+) Ek maliyet yok
+- (+) Mevcut nginx + cert mekanizmasını reuse
+- (−) AykutOnPC ile kaynak çakışması riski (mem_limit zorunlu)
+- (−) Bir VPS down olursa iki proje birden etkilenir (kabul, kritiklik düşük)
+
+---
+
+## ADR-005 — Mesaj Şifreleme: Server-Side (TLS + AES-256 at-rest)
+
+- **Tarih:** 2026-05-08
+- **Durum:** Kabul edildi
+- **Karar verenler:** AppSec, Tech Lead, PO
+
+**Bağlam:**
+Mesaj şifreleme modeli: server-side (admin okuyabilir) mi, E2E (kimse okuyamaz) mı?
+
+**Değerlendirilen Seçenekler:**
+1. Server-side — TLS in-transit + AES-256 at-rest, admin DB'den okuyabilir
+2. E2E (Signal protokolü) — sadece gönderen + alıcı okuyabilir, çok-cihaz senkronu zor
+3. Hybrid — normal mesaj server-side, "secret chat" modu E2E
+
+**Karar:**
+Seçenek 1 — Server-side encryption.
+
+**Rationale:**
+Kullanıcı kişisel mesajlaşmasını yürütüyor + admin kendisi → çok-cihazda history senkronu kritik. E2E key kaybı = mesaj kaybı. Mimari karmaşıklığı 5x. v1 için server-side yeterli.
+
+**Sonuçlar / Trade-off'lar:**
+- (+) Çok-cihaz senkron kolay
+- (+) Admin moderasyon mümkün (gerekirse)
+- (+) Mimari basit, deliver hızlı
+- (−) DB compromise = mesaj kaybı (AES-256 at-rest hafifletir ama key access olursa güvenli değil)
+- (−) "True privacy" beklentisi olan kullanıcı için yeterli değil — proje kapsamı bunu istemiyor
+- ⚠️ İleride hybrid modu eklenebilir (Sprint backlog)
+
+---
+
+## ADR-004 — Mobile Cross-Platform: Kotlin Multiplatform + Compose Multiplatform
+
+- **Tarih:** 2026-05-08
+- **Durum:** Kabul edildi
+- **Karar verenler:** Senior Dev #3, Tech Lead, Innovation Architect, PO
+
+**Bağlam:**
+Kullanıcının iOS cihazı da var → iOS desteği gerekli. Native iki ayrı kod tabanı (Swift + Kotlin) maliyetli. Cross-platform framework seçimi.
+
+**Değerlendirilen Seçenekler:**
+1. Kotlin Multiplatform + Compose Multiplatform — Kotlin tek dil, native UI, JetBrains backed
+2. Flutter — Dart, en olgun ekosistem, hot reload, geniş paket havuzu
+3. React Native — JS, web ekibi varsa cazip — yok
+
+**Karar:**
+Seçenek 1 — KMP + CMP.
+
+**Rationale:**
+Branch zaten `kotlin-rewrite`. Kotlin yatırımı korunur. CMP iOS desteği 1.7+ ile production-ready (2026 itibariyle stable). Tek dil = single team yetkinliği. Native widget performansı.
+
+**Sonuçlar / Trade-off'lar:**
+- (+) Mevcut Kotlin migration'u boşa gitmez
+- (+) Native performance, native widget
+- (+) Tek dil
+- (−) iOS HIG için bazen SwiftUI bridging gerekebilir
+- (−) Flutter kadar olgun ekosistem yok (kütüphane sayısı az)
+- ⚠️ Sprint #2'de iskelet kurulurken iOS toolchain (Xcode) hazırlığı şart
+
+---
+
+## ADR-003 — Backend Stack: ASP.NET Core 9 + Postgres + EF + SignalR + Redis + MinIO
+
+- **Tarih:** 2026-05-08
+- **Durum:** Kabul edildi
+- **Karar verenler:** Senior Dev #1, Senior Dev #2, Tech Lead, PO
+
+**Bağlam:**
+Self-host backend stack'i seçimi. Performans, ekip yetkinliği, mevcut altyapıyla uyum.
+
+**Değerlendirilen Seçenekler:**
+1. ASP.NET Core 9 + Postgres — mevcut VPS'te aynı stack
+2. Node.js (NestJS) + Postgres — JS ekosistem
+3. Go (Echo/Fiber) + Postgres — performans odaklı
+
+**Karar:**
+Seçenek 1 — ASP.NET Core 9 + PostgreSQL 16 + EF Core + SignalR + Redis 7 + MinIO.
+
+**Rationale:**
+Mevcut VPS'te aynı .NET 9 runtime çalışıyor. Container base image, deploy script, monitoring pattern reuse edilebilir. SignalR DM real-time için doğal çözüm. EF Core migration disiplini iyi.
+
+**Sonuçlar / Trade-off'lar:**
+- (+) Container reuse, deploy hızı
+- (+) Mevcut deploy.sh / runbook pattern'leri
+- (+) SignalR — WebSocket için en olgun .NET çözümü
+- (−) Mobil ekosistem perspektifinden Node.js daha "yaygın", ama ekip yetkinliği belirleyici
+- ⚠️ Versiyon hizalaması: ASP.NET Core 8 değil **9** — VPS'te 9 var
+
+---
+
+## ADR-002 — Firebase'den Self-Host'a Geçiş
+
+- **Tarih:** 2026-05-08
+- **Durum:** Kabul edildi
+- **Karar verenler:** Kullanıcı, PO, AppSec, Tech Lead
+
+**Bağlam:**
+Mevcut Mimir Firebase BOM 33.1.2 kullanıyor: Auth, Firestore, Storage, Analytics. Kullanıcı bu bağımlılığı kaldırıp kendi Hetzner VPS'inde self-host etmek istiyor. Sebepler: vendor lock-in, maliyet kontrolsüzlüğü (kullanıcı arttıkça okuma/yazma faturası), KVKK veri lokasyon kontrolü, Google bağımlılığını minimize etme.
+
+**Değerlendirilen Seçenekler:**
+1. Tam self-host — tüm Firebase SDK'larını çıkar, kendi backend kur
+2. Hibrit — Auth'ı kendi backend'inde, Firestore'da kal
+3. Status quo — Firebase'de kal
+
+**Karar:**
+Seçenek 1 — Tam self-host. Auth + DB + Storage + Analytics → kendi backend.
+
+**Rationale:**
+Kullanıcının vizyonu net: kapalı, kişisel network + admin onay + kişisel mesajlaşma + yüksek güvenlik. Bu vizyon Firebase'in pattern'iyle (open client SDK, kullanıcı self-service Auth) çelişiyor. Hibrit kompleks (iki auth context). Tek atışta self-host'a geç.
+
+**Sonuçlar / Trade-off'lar:**
+- (+) Tam veri kontrolü (KVKK, log, backup)
+- (+) Maliyet öngörülebilir (VPS sabit, Firebase metered)
+- (+) Custom logic (admin onay flow Firebase'de zor)
+- (−) Yazılacak kod miktarı ↑↑ (auth, OTP, storage, analytics — hepsi)
+- (−) Operasyonel sorumluluk (uptime, backup, security patch — DevOps/SRE'ye düşer)
+- (−) Bug surface ↑ (Firebase battle-tested → kendi kod yeni)
+- ⚠️ Sprint #2-3 boyunca Firebase'le **paralel çalışma yok** — branch ayrı, eski kod silinene kadar dokunma
+
+---
+
+## ADR-001 — Enterprise Takım Context'i Bu Projede Aktive Edildi
+
+- **Tarih:** 2026-05-08
+- **Durum:** Kabul edildi
+- **Karar verenler:** Kullanıcı, PO
+
+**Bağlam:**
+Global enterprise takım promptu (`~/.claude_enterprise_team.md`) zaten yüklüydü. Bu projede ek olarak `.claudeteam/` context dizini açıldı → karar geçmişi, mimari, sprint disiplini bu repo'da yaşar.
+
+Tetikleyen vizyon: Firebase'den self-host VPS'e geçiş + admin-onaylı kapalı sosyal ağ + güvenli kişisel mesajlaşma. Çok-epic'li bir iş, scope ve kararlar kayıt altında olmalı.
+
+**Karar:**
+`/enterpriseteam` slash command ile `~/.claude/team-template/` üzerinden bootstrap yapıldı.
+
+**Sonraki adımlar:**
+- T-001: İlk takım toplantısı (scope + kritik kararlar)
+- T-002: PROJECT_CONTEXT.md ve ARCHITECTURE.md gerçek içerikle doldurulacak
+- T-003: Mevcut stack TECH_RADAR.md'ye haritalanacak
+- T-004: ADR-002 (Firebase exit kararı)
