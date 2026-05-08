@@ -48,6 +48,36 @@ data class VerifyEmailResponse(
     @SerialName("message") val message: String,
 )
 
+// ─────────────────────── Admin ─────────────────────
+
+@Serializable
+data class InvitationCreateRequest(
+    @SerialName("note") val note: String? = null,
+    @SerialName("expiryDays") val expiryDays: Int? = null,
+)
+
+@Serializable
+data class InvitationCreateResponse(
+    @SerialName("id") val id: String,
+    @SerialName("token") val token: String,
+    @SerialName("expiresAt") val expiresAt: String,
+)
+
+@Serializable
+data class PendingUserDto(
+    @SerialName("id") val id: String,
+    @SerialName("username") val username: String,
+    @SerialName("email") val email: String,
+    @SerialName("phone") val phone: String? = null,
+    @SerialName("createdAt") val createdAt: String,
+)
+
+@Serializable
+data class ApprovalDecisionRequest(
+    @SerialName("decision") val decision: String,   // "approve" | "reject" | "suspend"
+    @SerialName("reason") val reason: String? = null,
+)
+
 // ─────────────────────── Errors ─────────────────────
 
 @Serializable

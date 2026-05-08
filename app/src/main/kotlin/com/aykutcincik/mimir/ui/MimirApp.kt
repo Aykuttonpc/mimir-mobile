@@ -15,7 +15,8 @@ sealed interface Screen {
     data object Register : Screen
     data class EmailSent(val email: String) : Screen
     data class Pending(val username: String) : Screen
-    data class Home(val username: String, val isAdmin: Boolean) : Screen
+    data class Home(val username: String, val isAdmin: Boolean, val accessToken: String) : Screen
+    data class Admin(val accessToken: String, val username: String, val isAdmin: Boolean) : Screen
 }
 
 @Composable
@@ -25,7 +26,7 @@ fun MimirApp() {
     when (val s = screen) {
         is Screen.Login -> LoginScreen(
             onLoggedIn = { auth ->
-                screen = Screen.Home(auth.username, auth.isAdmin)
+                screen = Screen.Home(auth.username, auth.isAdmin, auth.accessToken)
             },
             onAccountPending = { username ->
                 screen = Screen.Pending(username)
@@ -50,6 +51,13 @@ fun MimirApp() {
             username = s.username,
             isAdmin = s.isAdmin,
             onLogout = { screen = Screen.Login },
+            onOpenAdmin = if (s.isAdmin) {
+                { screen = Screen.Admin(s.accessToken, s.username, s.isAdmin) }
+            } else null,
+        )
+        is Screen.Admin -> AdminScreen(
+            accessToken = s.accessToken,
+            onBack = { screen = Screen.Home(s.username, s.isAdmin, s.accessToken) },
         )
     }
 }

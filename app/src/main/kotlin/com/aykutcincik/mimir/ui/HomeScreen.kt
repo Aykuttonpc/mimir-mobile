@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -18,13 +19,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 /**
- * Iskelet placeholder. Sprint #3 sonu / Sprint #4 başlangıcı: feed + DM + admin paneli buradan dallanır.
+ * Iskelet placeholder. Sprint #3 sonu / Sprint #4 başlangıcı: feed + DM buradan dallanır.
  */
 @Composable
 fun HomeScreen(
     username: String,
     isAdmin: Boolean,
     onLogout: () -> Unit,
+    onOpenAdmin: (() -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -44,8 +46,8 @@ fun HomeScreen(
         if (isAdmin) {
             Spacer(Modifier.height(8.dp))
             AssistChip(
-                onClick = { /* Sprint #3: admin paneli */ },
-                label = { Text("Admin") },
+                onClick = { onOpenAdmin?.invoke() },
+                label = { Text("Admin Paneli") },
                 colors = AssistChipDefaults.assistChipColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 ),
@@ -53,11 +55,15 @@ fun HomeScreen(
         }
         Spacer(Modifier.height(40.dp))
         Text(
-            text = "Feed + DM + admin paneli yakında.",
+            text = "Feed + DM yakında.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(32.dp))
+        if (isAdmin && onOpenAdmin != null) {
+            Button(onClick = onOpenAdmin) { Text("Admin Paneli") }
+            Spacer(Modifier.height(12.dp))
+        }
         OutlinedButton(onClick = onLogout) { Text("Çıkış") }
     }
 }
