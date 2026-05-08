@@ -1,22 +1,64 @@
 [versions]
-agp = "8.4.1"
+agp = "8.7.3"
+kotlin = "2.1.0"
+
+# AndroidX / Compose — compileSdk 34 ile uyumlu son versiyonlar
+# (sonraki sprint'te SDK 35'e upgrade ile bu sayılar yenilenir)
+composeBom = "2024.09.03"
+androidxActivityCompose = "1.9.2"
+androidxLifecycle = "2.8.6"
+androidxNavigation = "2.8.2"
+androidxDataStore = "1.1.1"
+androidxCore = "1.13.1"
+
+# Networking / serialization
+ktor = "3.0.1"
+kotlinxSerialization = "1.7.3"
+kotlinxCoroutines = "1.9.0"
+
+# Test
 junit = "4.13.2"
-junitVersion = "1.2.1"
-espressoCore = "3.6.1"
-appcompat = "1.7.0"
-material = "1.12.0"
-activity = "1.9.1"
-constraintlayout = "2.1.4"
 
 [libraries]
+# Compose
+androidx-activity-compose      = { module = "androidx.activity:activity-compose",      version.ref = "androidxActivityCompose" }
+androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "androidxLifecycle" }
+androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidxLifecycle" }
+androidx-navigation-compose    = { module = "androidx.navigation:navigation-compose",  version.ref = "androidxNavigation" }
+androidx-core-ktx              = { module = "androidx.core:core-ktx",                  version.ref = "androidxCore" }
+
+compose-bom              = { module = "androidx.compose:compose-bom",              version.ref = "composeBom" }
+compose-ui               = { module = "androidx.compose.ui:ui" }
+compose-ui-graphics      = { module = "androidx.compose.ui:ui-graphics" }
+compose-ui-tooling       = { module = "androidx.compose.ui:ui-tooling" }
+compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+compose-foundation       = { module = "androidx.compose.foundation:foundation" }
+compose-material3        = { module = "androidx.compose.material3:material3" }
+compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
+
+# DataStore (token storage)
+androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "androidxDataStore" }
+
+# Ktor (network)
+ktor-client-core           = { module = "io.ktor:ktor-client-core",                 version.ref = "ktor" }
+ktor-client-okhttp         = { module = "io.ktor:ktor-client-okhttp",               version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-client-logging        = { module = "io.ktor:ktor-client-logging",              version.ref = "ktor" }
+ktor-client-auth           = { module = "io.ktor:ktor-client-auth",                 version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+
+# Serialization + coroutines
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+kotlinx-coroutines-core    = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core",    version.ref = "kotlinxCoroutines" }
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
+
+# Test
 junit = { group = "junit", name = "junit", version.ref = "junit" }
-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
-material = { group = "com.google.android.material", name = "material", version.ref = "material" }
-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 
 [plugins]
-android-application = { id = "com.android.application", version.ref = "agp" }
-
+android-application      = { id = "com.android.application",                version.ref = "agp" }
+android-library          = { id = "com.android.library",                    version.ref = "agp" }
+kotlin-android           = { id = "org.jetbrains.kotlin.android",           version.ref = "kotlin" }
+kotlin-jvm               = { id = "org.jetbrains.kotlin.jvm",               version.ref = "kotlin" }
+kotlin-serialization     = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+compose-compiler         = { id = "org.jetbrains.kotlin.plugin.compose",    version.ref = "kotlin" }
