@@ -70,7 +70,9 @@
       "Bash(./gradlew :app:assembleDebug --no-daemon --console=plain)",
       "Read(//c/sdk//**)",
       "Read(//c/sdk/platforms/**)",
-      "Bash(./gradlew :app:assembleDebug --console=plain)"
+      "Bash(./gradlew :app:assembleDebug --console=plain)",
+      "Bash(git rm *)",
+      "Bash(git -c user.email=\"aykutcincik@ogr.eskisehir.edu.tr\" -c user.name=\"Aykut Cıncık\" commit -m \"fix\\(gitignore\\): exclude module-level build/ artifacts \\(data/build, app/build\\)\")"
     ]
   }
 }
