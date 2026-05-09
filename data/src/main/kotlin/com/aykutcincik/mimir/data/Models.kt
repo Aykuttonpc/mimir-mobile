@@ -129,6 +129,48 @@ data class ActiveUserDto(
     @SerialName("username") val username: String,
 )
 
+// ─────────────────────── ADR-016: Me + Friends ───────
+
+@Serializable
+data class MeDto(
+    @SerialName("id") val id: String,
+    @SerialName("username") val username: String,
+    @SerialName("email") val email: String,
+    @SerialName("phone") val phone: String? = null,
+    @SerialName("status") val status: String,
+    @SerialName("isAdmin") val isAdmin: Boolean,
+    @SerialName("friendKey") val friendKey: String? = null,
+    @SerialName("createdAt") val createdAt: String,
+)
+
+@Serializable
+data class FriendKeyDto(
+    @SerialName("friendKey") val friendKey: String,
+)
+
+@Serializable
+data class SendFriendRequestRequest(
+    @SerialName("friendKey") val friendKey: String,
+)
+
+@Serializable
+data class FriendRequestDto(
+    @SerialName("id") val id: String,
+    @SerialName("otherUserId") val otherUserId: String,
+    @SerialName("otherUsername") val otherUsername: String,
+    @SerialName("direction") val direction: String,   // "Incoming" | "Outgoing"
+    @SerialName("status") val status: String,
+    @SerialName("createdAt") val createdAt: String,
+    @SerialName("respondedAt") val respondedAt: String? = null,
+)
+
+@Serializable
+data class FriendDto(
+    @SerialName("userId") val userId: String,
+    @SerialName("username") val username: String,
+    @SerialName("friendsSince") val friendsSince: String,
+)
+
 @Serializable
 data class SendMessageRequest(
     @SerialName("content") val content: String,

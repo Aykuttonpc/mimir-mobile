@@ -13,18 +13,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import com.aykutcincik.mimir.Apis
 import com.aykutcincik.mimir.data.ApiResult
 import com.aykutcincik.mimir.data.DataStoreTokenStorage
-import com.aykutcincik.mimir.data.MimirApi
-import com.aykutcincik.mimir.data.SavedAuth
 import kotlinx.coroutines.launch
 
-/**
- * Sprint #3-4-5 navigation state-machine. Compose Navigation kütüphanesine geçişi ileride değerlendir.
- * T-038: app açılışında DataStore'dan token restore + refresh dene.
- */
 sealed interface Screen {
-    data object Bootstrap : Screen          // T-038: token restore deneme + T-039: version check
+    data object Bootstrap : Screen
     data class ForceUpdate(val current: String, val min: String, val downloadUrl: String) : Screen
     data object Login : Screen
     data object Register : Screen
@@ -34,8 +29,11 @@ sealed interface Screen {
     data class Admin(val accessToken: String, val username: String, val isAdmin: Boolean, val userId: String) : Screen
     data class ChangePassword(val accessToken: String, val username: String, val isAdmin: Boolean, val userId: String) : Screen
     data class ChatList(val accessToken: String, val username: String, val isAdmin: Boolean, val userId: String) : Screen
-    data class NewChat(val accessToken: String, val username: String, val isAdmin: Boolean, val userId: String) : Screen
     data class Chat(val accessToken: String, val currentUserId: String, val peerUserId: String, val peerUsername: String, val username: String, val isAdmin: Boolean) : Screen
+    data class Friends(val accessToken: String, val username: String, val isAdmin: Boolean, val userId: String) : Screen
+    data class AddFriend(val accessToken: String, val username: String, val isAdmin: Boolean, val userId: String) : Screen
+    data class FriendRequests(val accessToken: String, val username: String, val isAdmin: Boolean, val userId: String) : Screen
+    data class Me(val accessToken: String, val username: String, val isAdmin: Boolean, val userId: String) : Screen
 }
 
 @Composable
@@ -43,13 +41,12 @@ fun MimirApp() {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val storage = remember { DataStoreTokenStorage(ctx) }
-    val api = remember { com.aykutcincik.mimir.Apis.mimir() }
+    val api = remember { Apis.mimir() }
 
     var screen: Screen by remember { mutableStateOf<Screen>(Screen.Bootstrap) }
 
-    // T-038 + T-039: app açılışında version check + token restore + refresh
     LaunchedEffect(Unit) {
-        // 1) Force-update version check
+        // Force-update version check
         val versionResp = api.appVersion("android")
         if (versionResp is ApiResult.Success) {
             val current = com.aykutcincik.mimir.BuildConfig.VERSION_NAME
@@ -59,9 +56,8 @@ fun MimirApp() {
                 return@LaunchedEffect
             }
         }
-        // (Network fail durumunda devam — kullanıcı offline olsa da uygulamayı kullanabilsin)
 
-        // 2) Token restore + refresh
+        // Token restore + refresh
         val saved = storage.load()
         if (saved == null) {
             screen = Screen.Login
@@ -73,7 +69,6 @@ fun MimirApp() {
                 screen = Screen.Home(r.value.username, r.value.isAdmin, r.value.accessToken, saved.userId)
             }
             is ApiResult.Error -> {
-                // ADR-015: backend 426 → eski APK, ForceUpdate; diğer hata → Login
                 if (r.code == 426) {
                     storage.clear()
                     val info = (api.appVersion("android") as? ApiResult.Success)?.value
@@ -127,6 +122,7 @@ fun MimirApp() {
             onBack = { screen = Screen.Login },
         )
         is Screen.Home -> HomeScreen(
+            accessToken = s.accessToken,
             username = s.username,
             isAdmin = s.isAdmin,
             onLogout = {
@@ -138,6 +134,9 @@ fun MimirApp() {
             } else null,
             onChangePassword = { screen = Screen.ChangePassword(s.accessToken, s.username, s.isAdmin, s.userId) },
             onOpenMessages = { screen = Screen.ChatList(s.accessToken, s.username, s.isAdmin, s.userId) },
+            onOpenFriends = { screen = Screen.Friends(s.accessToken, s.username, s.isAdmin, s.userId) },
+            onOpenRequests = { screen = Screen.FriendRequests(s.accessToken, s.username, s.isAdmin, s.userId) },
+            onOpenMe = { screen = Screen.Me(s.accessToken, s.username, s.isAdmin, s.userId) },
         )
         is Screen.Admin -> AdminScreen(
             accessToken = s.accessToken,
@@ -157,14 +156,7 @@ fun MimirApp() {
             onOpenChat = { peerId, peerUsername ->
                 screen = Screen.Chat(s.accessToken, s.userId, peerId, peerUsername, s.username, s.isAdmin)
             },
-            onNewChat = { screen = Screen.NewChat(s.accessToken, s.username, s.isAdmin, s.userId) },
-        )
-        is Screen.NewChat -> NewChatScreen(
-            accessToken = s.accessToken,
-            onBack = { screen = Screen.ChatList(s.accessToken, s.username, s.isAdmin, s.userId) },
-            onPickUser = { peerId, peerUsername ->
-                screen = Screen.Chat(s.accessToken, s.userId, peerId, peerUsername, s.username, s.isAdmin)
-            },
+            onNewChat = { screen = Screen.Friends(s.accessToken, s.username, s.isAdmin, s.userId) },
         )
         is Screen.Chat -> ChatScreen(
             accessToken = s.accessToken,
@@ -175,15 +167,30 @@ fun MimirApp() {
                 screen = Screen.ChatList(s.accessToken, s.username, s.isAdmin, s.currentUserId)
             },
         )
+        is Screen.Friends -> FriendsScreen(
+            accessToken = s.accessToken,
+            onBack = { screen = Screen.Home(s.username, s.isAdmin, s.accessToken, s.userId) },
+            onAddFriend = { screen = Screen.AddFriend(s.accessToken, s.username, s.isAdmin, s.userId) },
+            onOpenChat = { peerId, peerUsername ->
+                screen = Screen.Chat(s.accessToken, s.userId, peerId, peerUsername, s.username, s.isAdmin)
+            },
+        )
+        is Screen.AddFriend -> AddFriendScreen(
+            accessToken = s.accessToken,
+            onBack = { screen = Screen.Friends(s.accessToken, s.username, s.isAdmin, s.userId) },
+            onRequestSent = { screen = Screen.Friends(s.accessToken, s.username, s.isAdmin, s.userId) },
+        )
+        is Screen.FriendRequests -> FriendRequestsScreen(
+            accessToken = s.accessToken,
+            onBack = { screen = Screen.Home(s.username, s.isAdmin, s.accessToken, s.userId) },
+        )
+        is Screen.Me -> MeScreen(
+            accessToken = s.accessToken,
+            onBack = { screen = Screen.Home(s.username, s.isAdmin, s.accessToken, s.userId) },
+        )
     }
 }
 
-/**
- * JWT payload'dan `sub` claim çıkar. JWT format: `header.payload.signature` — payload base64-url.
- */
-/**
- * Semantic version karşılaştırması (T-039). "0.1.0" < "0.2.0" → true.
- */
 private fun versionLessThan(a: String, b: String): Boolean {
     val ap = a.split(".").map { it.toIntOrNull() ?: 0 }
     val bp = b.split(".").map { it.toIntOrNull() ?: 0 }

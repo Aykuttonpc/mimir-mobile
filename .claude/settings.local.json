@@ -78,7 +78,9 @@
       "Bash(git -c user.email=\"aykutcincik@ogr.eskisehir.edu.tr\" -c user.name=\"Aykut Cıncık\" commit -m \"fix\\(gitignore\\): purge tracked build/ artifacts \\(data/build, app/build\\)\")",
       "Bash(./gradlew :app:compileDebugKotlin --console=plain)",
       "Bash(./gradlew :data:compileKotlin --console=plain)",
-      "Bash(git -c user.email=\"aykutcincik@ogr.eskisehir.edu.tr\" -c user.name=\"Aykut Cıncık\" commit -m \".claudeteam: Sprint #5 close + Sprint #6 plan \\(iOS + KMP refactor + APNs/FCM push\\)\")"
+      "Bash(git -c user.email=\"aykutcincik@ogr.eskisehir.edu.tr\" -c user.name=\"Aykut Cıncık\" commit -m \".claudeteam: Sprint #5 close + Sprint #6 plan \\(iOS + KMP refactor + APNs/FCM push\\)\")",
+      "Bash(ASPNETCORE_ENVIRONMENT=Development dotnet ef migrations add AddFriendKeyAndFriendships --output-dir Migrations)",
+      "Bash(git -c user.email=\"aykutcincik@ogr.eskisehir.edu.tr\" -c user.name=\"Aykut Cıncık\" commit -m \"Sprint #6 Tur 2 mobile \\(ADR-016\\): MeScreen + FriendsScreen + AddFriendScreen + FriendRequestsScreen + HomeScreen revize + NewChatScreen sil + FriendsApi\")"
     ]
   }
 }
