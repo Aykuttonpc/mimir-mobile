@@ -24,7 +24,8 @@ import kotlinx.coroutines.launch
  * T-038: app açılışında DataStore'dan token restore + refresh dene.
  */
 sealed interface Screen {
-    data object Bootstrap : Screen          // T-038: token restore deneme
+    data object Bootstrap : Screen          // T-038: token restore deneme + T-039: version check
+    data class ForceUpdate(val current: String, val min: String, val downloadUrl: String) : Screen
     data object Login : Screen
     data object Register : Screen
     data class EmailSent(val email: String) : Screen
@@ -46,14 +47,26 @@ fun MimirApp() {
 
     var screen: Screen by remember { mutableStateOf<Screen>(Screen.Bootstrap) }
 
-    // T-038: app açılışında token restore + refresh
+    // T-038 + T-039: app açılışında version check + token restore + refresh
     LaunchedEffect(Unit) {
+        // 1) Force-update version check
+        val versionResp = api.appVersion("android")
+        if (versionResp is ApiResult.Success) {
+            val current = com.aykutcincik.mimir.BuildConfig.VERSION_NAME
+            val min = versionResp.value.minSupportedVersion
+            if (versionLessThan(current, min)) {
+                screen = Screen.ForceUpdate(current, min, versionResp.value.downloadUrl)
+                return@LaunchedEffect
+            }
+        }
+        // (Network fail durumunda devam — kullanıcı offline olsa da uygulamayı kullanabilsin)
+
+        // 2) Token restore + refresh
         val saved = storage.load()
         if (saved == null) {
             screen = Screen.Login
             return@LaunchedEffect
         }
-        // Refresh dene — başarılıysa yeni access tokenla devam, başarısızsa Login'e
         when (val r = api.refresh(saved.refreshToken)) {
             is ApiResult.Success -> {
                 storage.save(r.value, saved.userId)
@@ -72,6 +85,11 @@ fun MimirApp() {
                 CircularProgressIndicator()
             }
         }
+        is Screen.ForceUpdate -> ForceUpdateScreen(
+            currentVersion = s.current,
+            minVersion = s.min,
+            downloadUrl = s.downloadUrl,
+        )
         is Screen.Login -> LoginScreen(
             onLoggedIn = { auth ->
                 val userId = extractSubFromJwt(auth.accessToken) ?: ""
@@ -148,6 +166,21 @@ fun MimirApp() {
 /**
  * JWT payload'dan `sub` claim çıkar. JWT format: `header.payload.signature` — payload base64-url.
  */
+/**
+ * Semantic version karşılaştırması (T-039). "0.1.0" < "0.2.0" → true.
+ */
+private fun versionLessThan(a: String, b: String): Boolean {
+    val ap = a.split(".").map { it.toIntOrNull() ?: 0 }
+    val bp = b.split(".").map { it.toIntOrNull() ?: 0 }
+    for (i in 0 until maxOf(ap.size, bp.size)) {
+        val av = ap.getOrElse(i) { 0 }
+        val bv = bp.getOrElse(i) { 0 }
+        if (av < bv) return true
+        if (av > bv) return false
+    }
+    return false
+}
+
 private fun extractSubFromJwt(jwt: String): String? = runCatching {
     val parts = jwt.split('.')
     if (parts.size < 2) return@runCatching null

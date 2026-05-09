@@ -27,6 +27,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true   // T-039: BuildConfig.VERSION_NAME erişimi için
     }
 
     compileOptions {

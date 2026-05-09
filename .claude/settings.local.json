@@ -75,7 +75,9 @@
       "Bash(git -c user.email=\"aykutcincik@ogr.eskisehir.edu.tr\" -c user.name=\"Aykut Cıncık\" commit -m \"fix\\(gitignore\\): exclude module-level build/ artifacts \\(data/build, app/build\\)\")",
       "Bash(git -c user.email=\"aykutcincik@ogr.eskisehir.edu.tr\" -c user.name=\"Aykut Cıncık\" commit -m \"T-022: RegisterScreen + EmailSentScreen + Login -> Register link\")",
       "Bash(git -c user.email=\"aykutcincik@ogr.eskisehir.edu.tr\" -c user.name=\"Aykut Cıncık\" commit -m \"T-026: Admin Paneli — davet uret + bekleyen kullanicilar listesi + onay/red\")",
-      "Bash(git -c user.email=\"aykutcincik@ogr.eskisehir.edu.tr\" -c user.name=\"Aykut Cıncık\" commit -m \"fix\\(gitignore\\): purge tracked build/ artifacts \\(data/build, app/build\\)\")"
+      "Bash(git -c user.email=\"aykutcincik@ogr.eskisehir.edu.tr\" -c user.name=\"Aykut Cıncık\" commit -m \"fix\\(gitignore\\): purge tracked build/ artifacts \\(data/build, app/build\\)\")",
+      "Bash(./gradlew :app:compileDebugKotlin --console=plain)",
+      "Bash(./gradlew :data:compileKotlin --console=plain)"
     ]
   }
 }

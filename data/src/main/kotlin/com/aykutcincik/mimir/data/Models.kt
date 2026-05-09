@@ -134,6 +134,16 @@ data class SendMessageRequest(
     @SerialName("content") val content: String,
 )
 
+// ─────────────────────── App version (T-039) ────────
+
+@Serializable
+data class AppVersionInfoDto(
+    @SerialName("minSupportedVersion") val minSupportedVersion: String,
+    @SerialName("latestVersion") val latestVersion: String,
+    @SerialName("downloadUrl") val downloadUrl: String,
+    @SerialName("platform") val platform: String,
+)
+
 // ─────────────────────── Errors ─────────────────────
 
 @Serializable

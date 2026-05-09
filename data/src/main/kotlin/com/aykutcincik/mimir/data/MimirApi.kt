@@ -76,6 +76,15 @@ class MimirApi(
             ApiResult.Error(resp.status.value)
     }.getOrElse { ApiResult.Failure(it) }
 
+    /** Public — auth gerekmez. T-039 force-update mekanizması. */
+    suspend fun appVersion(platform: String = "android"): ApiResult<AppVersionInfoDto> = runCatching<ApiResult<AppVersionInfoDto>> {
+        val resp: HttpResponse = client.get("api/app/version") {
+            parameter("platform", platform)
+        }
+        if (resp.status.value in 200..299) ApiResult.Success(resp.body<AppVersionInfoDto>())
+        else ApiResult.Error(resp.status.value)
+    }.getOrElse { ApiResult.Failure(it) }
+
     /** Authenticated — accessToken Bearer header'ında gider. T-024 */
     suspend fun changePassword(accessToken: String, current: String, new: String): ApiResult<Unit> = runCatching {
         val resp: HttpResponse = client.post("api/auth/change-password") {

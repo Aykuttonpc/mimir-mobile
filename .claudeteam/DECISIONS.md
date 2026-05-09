@@ -34,6 +34,56 @@
 
 ---
 
+## ADR-014 — Push Notification Provider: APNs + FCM Direct (self-host disiplini)
+
+- **Tarih:** 2026-05-09
+- **Durum:** Kabul edildi
+- **Karar verenler:** AppSec, Innovation Architect, ML/RAG Engineer, Tech Lead, PO
+
+**Bağlam:**
+T-034 push notification implementasyonu için provider seçimi. ADR-002'de Firebase exit yapıldı; şimdi push için ne kullanacak?
+
+**Değerlendirilen Seçenekler:**
+
+| | APNs + FCM direct | OneSignal | AWS SNS |
+|---|---|---|---|
+| Setup karmaşıklığı | Orta-Yüksek (iki provider) | Düşük (tek SDK) | Orta (iki provider altında) |
+| iOS uyumu | ✅ APNs direct | ✅ APNs aracılı | ✅ |
+| Android | FCM direct | OneSignal aracılı | ✅ |
+| Self-host | Backend kendisi | 3rd party | 3rd party (AWS) |
+| KVKK / 3rd-party flow | Sadece Apple/Google | + OneSignal | + AWS |
+| Maliyet | Apple developer $99/yıl, FCM free | Free tier 100k device | Free tier sonra metered |
+| ADR-002 (vendor min) uyum | ✅ | ❌ | ❌ |
+
+**Karar:**
+**APNs + FCM direct** — kendi backend'imizden push.
+
+**Rationale:**
+- ADR-002 (Firebase exit) felsefesi: vendor lock-in min, KVKK self-host disiplini
+- 3rd party (OneSignal/AWS) ekleme = veri akışı ek hop, KVKK kapsam genişler
+- 100 kullanıcı boyutu için OneSignal SDK + dashboard overhead'i orantısız
+- FCM HTTP v1 API ücretsiz (Google Android için open free service)
+- APNs Apple developer hesabı zaten iOS için zorunlu (Sprint #6)
+
+**Implementation (Sprint #5 sonu / #6):**
+- Backend: `IPushSender` interface, `FcmPushSender` (Android), `ApnsPushSender` (iOS, Sprint #6)
+- Yeni mesaj olunca `MessagesController` + `DmHub` recipient device tokens'ını çek + send
+- Yeni tablo: `device_tokens` (UserId, Token, Platform: android|ios, RegisteredAt, RevokedAt)
+- Yeni endpoint: `POST /api/users/me/device-token` (auth, device token register)
+- Android: `firebase-messaging` SDK (sadece messaging — Firebase BOM full değil) ya da pure FCM HTTP + Google service-account JWT
+- Quiet hours / batching: ileride ek katman
+
+**Sonuçlar / Trade-off'lar:**
+- (+) Self-host disiplini korundu (ADR-002 ile uyumlu)
+- (+) Maliyet kontrol altında (Android ücretsiz, iOS Apple developer ekonomisi)
+- (+) Veri akışı sadece Apple+Google (zaten platform sahipleri)
+- (−) İki provider impl gerekli (iOS Sprint #6'da)
+- (−) Apple/Google geçici outage = push gitmez (kabul, business critical değil — DM polling fallback'i ile mesaj kaybı yok)
+- ⚠️ Service account JSON sensitive — VPS .env.prod'da saklanır, git'e gitmez
+- ⚠️ Apple developer hesabı $99/yıl — iOS Sprint #6'da kullanıcıya teyit ettirilir
+
+---
+
 ## ADR-013 — DM Yetkisi: Tüm Active Kullanıcılar Birbirine Mesaj Atabilir (arkadaş ekleme modeli yok)
 
 - **Tarih:** 2026-05-09
