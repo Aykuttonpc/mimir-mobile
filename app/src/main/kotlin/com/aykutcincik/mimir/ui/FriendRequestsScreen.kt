@@ -46,7 +46,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun FriendRequestsScreen(
     accessToken: String,
-    onBack: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val api = remember(accessToken) { Apis.friends(accessToken) }
@@ -73,7 +72,6 @@ fun FriendRequestsScreen(
         topBar = {
             MimirTopBar(
                 title = "Arkadaşlık İstekleri",
-                onBack = onBack,
                 actions = {
                     IconButton(onClick = { scope.launch { reload() } }, enabled = !loading) {
                         if (loading) CircularProgressIndicator(modifier = Modifier.size(20.dp))

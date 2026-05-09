@@ -52,7 +52,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun ChatListScreen(
     accessToken: String,
-    onBack: () -> Unit,
     onOpenChat: (peerId: String, peerUsername: String) -> Unit,
     onNewChat: () -> Unit,
 ) {
@@ -81,7 +80,6 @@ fun ChatListScreen(
         topBar = {
             MimirTopBar(
                 title = "Mesajlar",
-                onBack = onBack,
                 actions = {
                     IconButton(onClick = { scope.launch { reload() } }, enabled = !loading) {
                         if (loading) CircularProgressIndicator(modifier = Modifier.size(20.dp))

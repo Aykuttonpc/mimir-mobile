@@ -2,10 +2,19 @@ package com.aykutcincik.mimir.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -13,11 +22,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.runtime.collectAsState
 import com.aykutcincik.mimir.Apis
 import com.aykutcincik.mimir.data.ApiResult
 import com.aykutcincik.mimir.data.DataStoreTokenStorage
 import com.aykutcincik.mimir.push.PushRegistrar
+import com.aykutcincik.mimir.ui.components.MimirBottomBar
+import com.aykutcincik.mimir.ui.components.MimirTab
 import com.aykutcincik.mimir.util.VersionGate
 import kotlinx.coroutines.launch
 
@@ -28,15 +38,23 @@ sealed interface Screen {
     data object Register : Screen
     data class EmailSent(val email: String) : Screen
     data class Pending(val username: String) : Screen
-    data class Home(val username: String, val isAdmin: Boolean, val accessToken: String, val userId: String) : Screen
-    data class Admin(val accessToken: String, val username: String, val isAdmin: Boolean, val userId: String) : Screen
-    data class ChangePassword(val accessToken: String, val username: String, val isAdmin: Boolean, val userId: String) : Screen
-    data class ChatList(val accessToken: String, val username: String, val isAdmin: Boolean, val userId: String) : Screen
-    data class Chat(val accessToken: String, val currentUserId: String, val peerUserId: String, val peerUsername: String, val username: String, val isAdmin: Boolean) : Screen
-    data class Friends(val accessToken: String, val username: String, val isAdmin: Boolean, val userId: String) : Screen
-    data class AddFriend(val accessToken: String, val username: String, val isAdmin: Boolean, val userId: String) : Screen
-    data class FriendRequests(val accessToken: String, val username: String, val isAdmin: Boolean, val userId: String) : Screen
-    data class Me(val accessToken: String, val username: String, val isAdmin: Boolean, val userId: String) : Screen
+    data class Authed(
+        val accessToken: String,
+        val username: String,
+        val isAdmin: Boolean,
+        val userId: String,
+        val tab: AuthTab = AuthTab.Messages,
+        val detail: AuthDetail? = null,
+    ) : Screen
+}
+
+enum class AuthTab { Messages, Friends, Requests, Profile }
+
+sealed interface AuthDetail {
+    data class Chat(val peerUserId: String, val peerUsername: String) : AuthDetail
+    data object AddFriend : AuthDetail
+    data object Admin : AuthDetail
+    data object ChangePassword : AuthDetail
 }
 
 @Composable
@@ -48,8 +66,6 @@ fun MimirApp() {
 
     var screen: Screen by remember { mutableStateOf<Screen>(Screen.Bootstrap) }
 
-    // Global VersionGate — herhangi bir API client 426 görünce trigger olur,
-    // app-wide olarak ForceUpdateScreen'a yönlendirir.
     val gateTriggered by VersionGate.triggered.collectAsState()
     LaunchedEffect(gateTriggered) {
         if (gateTriggered && screen !is Screen.ForceUpdate) {
@@ -65,7 +81,6 @@ fun MimirApp() {
     }
 
     LaunchedEffect(Unit) {
-        // Force-update version check
         val versionResp = api.appVersion("android")
         if (versionResp is ApiResult.Success) {
             val current = com.aykutcincik.mimir.BuildConfig.VERSION_NAME
@@ -76,7 +91,6 @@ fun MimirApp() {
             }
         }
 
-        // Token restore + refresh
         val saved = storage.load()
         if (saved == null) {
             screen = Screen.Login
@@ -85,9 +99,8 @@ fun MimirApp() {
         when (val r = api.refresh(saved.refreshToken)) {
             is ApiResult.Success -> {
                 storage.save(r.value, saved.userId)
-                // ADR-017: FCM token kaydı (refresh sonrası — eski APK'lar bu noktayı ekler)
                 PushRegistrar.register(r.value.accessToken)
-                screen = Screen.Home(r.value.username, r.value.isAdmin, r.value.accessToken, saved.userId)
+                screen = Screen.Authed(r.value.accessToken, r.value.username, r.value.isAdmin, saved.userId)
             }
             is ApiResult.Error -> {
                 if (r.code == 426) {
@@ -126,10 +139,9 @@ fun MimirApp() {
                 val userId = extractSubFromJwt(auth.accessToken) ?: ""
                 scope.launch {
                     storage.save(auth, userId)
-                    // ADR-017: FCM token kaydı (login sonrası)
                     PushRegistrar.register(auth.accessToken)
                 }
-                screen = Screen.Home(auth.username, auth.isAdmin, auth.accessToken, userId)
+                screen = Screen.Authed(auth.accessToken, auth.username, auth.isAdmin, userId)
             },
             onAccountPending = { username -> screen = Screen.Pending(username) },
             onGoToRegister = { screen = Screen.Register },
@@ -146,34 +158,17 @@ fun MimirApp() {
             username = s.username,
             onBack = { screen = Screen.Login },
         )
-        is Screen.Home -> HomeScreen(
-            accessToken = s.accessToken,
-            username = s.username,
-            isAdmin = s.isAdmin,
+        is Screen.Authed -> AuthedScaffold(
+            state = s,
+            onUpdate = { screen = it },
             onLogout = {
                 scope.launch {
-                    PushRegistrar.unregister(s.accessToken)   // ADR-017: token'ı backend'den sil
+                    PushRegistrar.unregister(s.accessToken)
                     storage.clear()
                 }
                 screen = Screen.Login
             },
-            onOpenAdmin = if (s.isAdmin) {
-                { screen = Screen.Admin(s.accessToken, s.username, s.isAdmin, s.userId) }
-            } else null,
-            onChangePassword = { screen = Screen.ChangePassword(s.accessToken, s.username, s.isAdmin, s.userId) },
-            onOpenMessages = { screen = Screen.ChatList(s.accessToken, s.username, s.isAdmin, s.userId) },
-            onOpenFriends = { screen = Screen.Friends(s.accessToken, s.username, s.isAdmin, s.userId) },
-            onOpenRequests = { screen = Screen.FriendRequests(s.accessToken, s.username, s.isAdmin, s.userId) },
-            onOpenMe = { screen = Screen.Me(s.accessToken, s.username, s.isAdmin, s.userId) },
-        )
-        is Screen.Admin -> AdminScreen(
-            accessToken = s.accessToken,
-            onBack = { screen = Screen.Home(s.username, s.isAdmin, s.accessToken, s.userId) },
-        )
-        is Screen.ChangePassword -> ChangePasswordScreen(
-            accessToken = s.accessToken,
-            onBack = { screen = Screen.Home(s.username, s.isAdmin, s.accessToken, s.userId) },
-            onSuccessRequireRelogin = {
+            onForceLogout = {
                 scope.launch {
                     PushRegistrar.unregister(s.accessToken)
                     storage.clear()
@@ -181,44 +176,103 @@ fun MimirApp() {
                 screen = Screen.Login
             },
         )
-        is Screen.ChatList -> ChatListScreen(
-            accessToken = s.accessToken,
-            onBack = { screen = Screen.Home(s.username, s.isAdmin, s.accessToken, s.userId) },
-            onOpenChat = { peerId, peerUsername ->
-                screen = Screen.Chat(s.accessToken, s.userId, peerId, peerUsername, s.username, s.isAdmin)
-            },
-            onNewChat = { screen = Screen.Friends(s.accessToken, s.username, s.isAdmin, s.userId) },
-        )
-        is Screen.Chat -> ChatScreen(
-            accessToken = s.accessToken,
-            currentUserId = s.currentUserId,
-            peerUserId = s.peerUserId,
-            peerUsername = s.peerUsername,
-            onBack = {
-                screen = Screen.ChatList(s.accessToken, s.username, s.isAdmin, s.currentUserId)
-            },
-        )
-        is Screen.Friends -> FriendsScreen(
-            accessToken = s.accessToken,
-            onBack = { screen = Screen.Home(s.username, s.isAdmin, s.accessToken, s.userId) },
-            onAddFriend = { screen = Screen.AddFriend(s.accessToken, s.username, s.isAdmin, s.userId) },
-            onOpenChat = { peerId, peerUsername ->
-                screen = Screen.Chat(s.accessToken, s.userId, peerId, peerUsername, s.username, s.isAdmin)
-            },
-        )
-        is Screen.AddFriend -> AddFriendScreen(
-            accessToken = s.accessToken,
-            onBack = { screen = Screen.Friends(s.accessToken, s.username, s.isAdmin, s.userId) },
-            onRequestSent = { screen = Screen.Friends(s.accessToken, s.username, s.isAdmin, s.userId) },
-        )
-        is Screen.FriendRequests -> FriendRequestsScreen(
-            accessToken = s.accessToken,
-            onBack = { screen = Screen.Home(s.username, s.isAdmin, s.accessToken, s.userId) },
-        )
-        is Screen.Me -> MeScreen(
-            accessToken = s.accessToken,
-            onBack = { screen = Screen.Home(s.username, s.isAdmin, s.accessToken, s.userId) },
-        )
+    }
+}
+
+@Composable
+private fun AuthedScaffold(
+    state: Screen.Authed,
+    onUpdate: (Screen.Authed) -> Unit,
+    onLogout: () -> Unit,
+    onForceLogout: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val friendsApi = remember(state.accessToken) { Apis.friends(state.accessToken) }
+    var pendingCount by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(state.accessToken) {
+        when (val r = friendsApi.listPendingRequests()) {
+            is ApiResult.Success -> pendingCount = r.value.count { it.direction == "Incoming" }
+            else -> {}
+        }
+    }
+
+    // Detail screen has priority — no bottom bar shown.
+    val detail = state.detail
+    if (detail != null) {
+        when (detail) {
+            is AuthDetail.Chat -> ChatScreen(
+                accessToken = state.accessToken,
+                currentUserId = state.userId,
+                peerUserId = detail.peerUserId,
+                peerUsername = detail.peerUsername,
+                onBack = { onUpdate(state.copy(detail = null)) },
+            )
+            AuthDetail.AddFriend -> AddFriendScreen(
+                accessToken = state.accessToken,
+                onBack = { onUpdate(state.copy(detail = null)) },
+                onRequestSent = { onUpdate(state.copy(detail = null)) },
+            )
+            AuthDetail.Admin -> AdminScreen(
+                accessToken = state.accessToken,
+                onBack = { onUpdate(state.copy(detail = null)) },
+            )
+            AuthDetail.ChangePassword -> ChangePasswordScreen(
+                accessToken = state.accessToken,
+                onBack = { onUpdate(state.copy(detail = null)) },
+                onSuccessRequireRelogin = onForceLogout,
+            )
+        }
+        return
+    }
+
+    val tabs = listOf(
+        MimirTab(AuthTab.Messages.name, "Mesajlar", Icons.AutoMirrored.Filled.Chat),
+        MimirTab(AuthTab.Friends.name, "Arkadaşlar", Icons.Filled.People),
+        MimirTab(AuthTab.Requests.name, "İstekler", Icons.Filled.Notifications, badge = pendingCount),
+        MimirTab(AuthTab.Profile.name, "Profilim", Icons.Filled.Person),
+    )
+
+    Scaffold(
+        bottomBar = {
+            MimirBottomBar(
+                tabs = tabs,
+                selectedKey = state.tab.name,
+                onSelect = { key ->
+                    val newTab = AuthTab.valueOf(key)
+                    if (newTab != state.tab) onUpdate(state.copy(tab = newTab))
+                },
+            )
+        },
+    ) { padding ->
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            when (state.tab) {
+                AuthTab.Messages -> ChatListScreen(
+                    accessToken = state.accessToken,
+                    onOpenChat = { peerId, peerUsername ->
+                        onUpdate(state.copy(detail = AuthDetail.Chat(peerId, peerUsername)))
+                    },
+                    onNewChat = { onUpdate(state.copy(tab = AuthTab.Friends)) },
+                )
+                AuthTab.Friends -> FriendsScreen(
+                    accessToken = state.accessToken,
+                    onAddFriend = { onUpdate(state.copy(detail = AuthDetail.AddFriend)) },
+                    onOpenChat = { peerId, peerUsername ->
+                        onUpdate(state.copy(detail = AuthDetail.Chat(peerId, peerUsername)))
+                    },
+                )
+                AuthTab.Requests -> FriendRequestsScreen(accessToken = state.accessToken)
+                AuthTab.Profile -> ProfileTab(
+                    accessToken = state.accessToken,
+                    isAdmin = state.isAdmin,
+                    onChangePassword = { onUpdate(state.copy(detail = AuthDetail.ChangePassword)) },
+                    onOpenAdmin = if (state.isAdmin) {
+                        { onUpdate(state.copy(detail = AuthDetail.Admin)) }
+                    } else null,
+                    onLogout = onLogout,
+                )
+            }
+        }
     }
 }
 

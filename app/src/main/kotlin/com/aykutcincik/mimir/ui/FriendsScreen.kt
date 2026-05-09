@@ -47,7 +47,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun FriendsScreen(
     accessToken: String,
-    onBack: () -> Unit,
     onAddFriend: () -> Unit,
     onOpenChat: (peerId: String, peerUsername: String) -> Unit,
 ) {
@@ -76,7 +75,6 @@ fun FriendsScreen(
         topBar = {
             MimirTopBar(
                 title = "Arkadaşlarım",
-                onBack = onBack,
                 actions = {
                     IconButton(onClick = { scope.launch { reload() } }, enabled = !loading) {
                         if (loading) CircularProgressIndicator(modifier = Modifier.size(20.dp))
