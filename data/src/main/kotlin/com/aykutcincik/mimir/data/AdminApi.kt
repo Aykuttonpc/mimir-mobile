@@ -7,6 +7,7 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
@@ -50,6 +51,21 @@ class AdminApi(
             val resp: HttpResponse = client.post("api/admin/invitations") { setBody(req) }
             parseResult<InvitationCreateResponse>(resp)
         }.getOrElse { ApiResult.Failure(it) }
+
+    suspend fun listInvitations(): ApiResult<List<InvitationSummaryDto>> = runCatching {
+        val resp: HttpResponse = client.get("api/admin/invitations")
+        parseResult<List<InvitationSummaryDto>>(resp)
+    }.getOrElse { ApiResult.Failure(it) }
+
+    suspend fun revokeInvitation(id: String): ApiResult<Unit> = runCatching {
+        val resp: HttpResponse = client.delete("api/admin/invitations/$id")
+        if (resp.status == HttpStatusCode.NoContent || resp.status.value in 200..299)
+            ApiResult.Success(Unit)
+        else {
+            val key = runCatching { resp.body<ApiErrorBody>().error }.getOrNull()
+            ApiResult.Error(resp.status.value, key)
+        }
+    }.getOrElse { ApiResult.Failure(it) }
 
     suspend fun listPending(): ApiResult<List<PendingUserDto>> = runCatching {
         val resp: HttpResponse = client.get("api/admin/users/pending")

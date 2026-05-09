@@ -84,6 +84,21 @@ data class ApprovalDecisionRequest(
     @SerialName("reason") val reason: String? = null,
 )
 
+/**
+ * Admin davet liste satırı (T-040). Token plain text DÖNMEZ — sadece hash backend'de.
+ * Status: "Active" | "Used" | "Expired".
+ */
+@Serializable
+data class InvitationSummaryDto(
+    @SerialName("id") val id: String,
+    @SerialName("note") val note: String? = null,
+    @SerialName("createdAt") val createdAt: String,
+    @SerialName("expiresAt") val expiresAt: String,
+    @SerialName("redeemedAt") val redeemedAt: String? = null,
+    @SerialName("redeemedByUsername") val redeemedByUsername: String? = null,
+    @SerialName("status") val status: String,
+)
+
 // ─────────────────────── Messaging (Sprint #4) ───────
 
 @Serializable

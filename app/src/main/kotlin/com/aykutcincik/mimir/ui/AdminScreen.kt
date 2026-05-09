@@ -18,6 +18,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
@@ -53,6 +55,7 @@ import com.aykutcincik.mimir.data.ApiResult
 import com.aykutcincik.mimir.data.ApprovalDecisionRequest
 import com.aykutcincik.mimir.data.InvitationCreateRequest
 import com.aykutcincik.mimir.data.InvitationCreateResponse
+import com.aykutcincik.mimir.data.InvitationSummaryDto
 import com.aykutcincik.mimir.data.PendingUserDto
 import kotlinx.coroutines.launch
 
@@ -77,6 +80,11 @@ fun AdminScreen(
     var pendingError by remember { mutableStateOf<String?>(null) }
     val processingIds = remember { mutableStateListOf<String>() }
 
+    val invitations = remember { mutableStateListOf<InvitationSummaryDto>() }
+    var invitationsLoading by remember { mutableStateOf(false) }
+    var invitationsError by remember { mutableStateOf<String?>(null) }
+    val revokingIds = remember { mutableStateListOf<String>() }
+
     suspend fun reloadPending() {
         pendingLoading = true
         pendingError = null
@@ -88,7 +96,18 @@ fun AdminScreen(
         pendingLoading = false
     }
 
-    LaunchedEffect(Unit) { reloadPending() }
+    suspend fun reloadInvitations() {
+        invitationsLoading = true
+        invitationsError = null
+        when (val r = api.listInvitations()) {
+            is ApiResult.Success -> { invitations.clear(); invitations.addAll(r.value) }
+            is ApiResult.Error -> { invitationsError = "Davet listesi alınamadı (HTTP ${r.code})" }
+            is ApiResult.Failure -> { invitationsError = "Bağlantı hatası: ${r.cause.message}" }
+        }
+        invitationsLoading = false
+    }
+
+    LaunchedEffect(Unit) { reloadPending(); reloadInvitations() }
 
     Column(
         modifier = Modifier
@@ -157,7 +176,10 @@ fun AdminScreen(
                                 expiryDays = days,
                             )
                             when (val r = api.createInvitation(req)) {
-                                is ApiResult.Success -> { lastInvite = r.value; note = "" }
+                                is ApiResult.Success -> {
+                                    lastInvite = r.value; note = ""
+                                    reloadInvitations()  // listeye hemen yansısın
+                                }
                                 is ApiResult.Error -> { inviteError = "Hata (HTTP ${r.code}${r.errorKey?.let { " — $it" } ?: ""})" }
                                 is ApiResult.Failure -> { inviteError = "Bağlantı hatası: ${r.cause.message}" }
                             }
@@ -278,7 +300,127 @@ fun AdminScreen(
             }
         }
 
+        Spacer(Modifier.height(20.dp))
+
+        // ── Davetlerim ──
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.MailOutline, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Text(
+                    text = "  Davetlerim (${invitations.size})",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+            IconButton(onClick = { scope.launch { reloadInvitations() } }, enabled = !invitationsLoading) {
+                if (invitationsLoading) CircularProgressIndicator(modifier = Modifier.height(20.dp))
+                else Icon(Icons.Default.Refresh, contentDescription = "Yenile")
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+
+        if (invitationsError != null) {
+            Text(invitationsError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+        } else if (invitations.isEmpty() && !invitationsLoading) {
+            Text(
+                text = "Henüz davet üretilmemiş.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        } else {
+            invitations.forEach { inv ->
+                InvitationRow(
+                    inv = inv,
+                    isRevoking = inv.id in revokingIds,
+                    onRevoke = {
+                        revokingIds.add(inv.id)
+                        scope.launch {
+                            val r = api.revokeInvitation(inv.id)
+                            val msg = when (r) {
+                                is ApiResult.Success -> "Davet iptal edildi"
+                                is ApiResult.Error -> "İptal başarısız (${r.errorKey ?: "HTTP ${r.code}"})"
+                                is ApiResult.Failure -> "Bağlantı hatası"
+                            }
+                            Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
+                            revokingIds.remove(inv.id)
+                            reloadInvitations()
+                        }
+                    },
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun InvitationRow(
+    inv: InvitationSummaryDto,
+    isRevoking: Boolean,
+    onRevoke: () -> Unit,
+) {
+    val statusColor = when (inv.status) {
+        "Active" -> MaterialTheme.colorScheme.primary
+        "Used"   -> MaterialTheme.colorScheme.tertiary
+        else     -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val statusLabel = when (inv.status) {
+        "Active" -> "Aktif"
+        "Used"   -> "Kullanıldı"
+        "Expired"-> "Süresi dolmuş"
+        else     -> inv.status
+    }
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.padding(end = 8.dp)) {
+                Text(
+                    text = inv.note?.takeIf { it.isNotBlank() } ?: "(notsuz)",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "Üretildi: ${inv.createdAt.take(19).replace('T', ' ')}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "Bitiş: ${inv.expiresAt.take(19).replace('T', ' ')}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (inv.redeemedByUsername != null) {
+                    Text(
+                        text = "Kullanan: @${inv.redeemedByUsername} (${inv.redeemedAt?.take(10) ?: ""})",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                }
+                Text(
+                    text = statusLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = statusColor,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Spacer(modifier = Modifier.weight(1f, fill = true))
+            if (inv.status == "Active") {
+                IconButton(onClick = onRevoke, enabled = !isRevoking) {
+                    if (isRevoking) CircularProgressIndicator(modifier = Modifier.height(20.dp))
+                    else Icon(Icons.Default.Delete, contentDescription = "İptal et", tint = MaterialTheme.colorScheme.error)
+                }
+            }
+        }
     }
 }
 
