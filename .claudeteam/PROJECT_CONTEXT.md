@@ -4,8 +4,8 @@
 
 - **Proje adı:** **Mimir** (Norse mit. — bilgelik kuyusunun başı; ADR-009)
 - **Sahibi / paydaş:** Aykut (tek paydaş, admin)
-- **Durum:** **Backend MVP production-ready** (Sprint #2 close 2026-05-09). Mobile UI Sprint #3'te.
-- **Aktif branch:** `kotlin-rewrite` (Sprint #2'de KMP rewrite için yeni branch açılacak)
+- **Durum:** **Backend + Mobile MVP production-ready** (Sprint #2 + #3 close 2026-05-09). Sprint #4 messaging başlangıcında.
+- **Aktif branch:** `kmp-rewrite` (mobile, Sprint #3 itibariyle Kotlin+Compose). Backend `mimir-api` master branch.
 - **URL:** `https://aykutonpc.com/mimir/` — Let's Encrypt cert üzerinden public erişim. Mobile-only, path prefix routing (ADR-007). `/mimir/health` canlı.
 - **Repolar:**
   - Backend: [mimir-api](https://github.com/Aykuttonpc/mimir-api) — `D:\Projeler\mimir-api`

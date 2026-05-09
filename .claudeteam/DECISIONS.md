@@ -34,6 +34,73 @@
 
 ---
 
+## ADR-013 — DM Yetkisi: Tüm Active Kullanıcılar Birbirine Mesaj Atabilir (arkadaş ekleme modeli yok)
+
+- **Tarih:** 2026-05-09
+- **Durum:** Kabul edildi
+- **Karar verenler:** PO, Analist 1, AppSec, Tech Lead
+
+**Bağlam:**
+Mimir kapalı network. Her kullanıcı admin (Aykut) onayından geçmiş = "tanıdık". DM yetkilendirme modeli iki yol: (a) arkadaş ekleme + onay → DM, (b) Active herkes herkese DM.
+
+**Karar:**
+(b) — Tüm `UserStatus.Active` kullanıcılar birbirine DM atabilir. Arkadaş ekleme akışı yok.
+
+**Rationale:**
+- Kapalı network'te admin filtresi zaten "kim üye olabilir"i belirler — ek arkadaş onayı redundant
+- 100 hedef kullanıcı boyutunda complex social graph overhead'i mantıksız
+- v1 basit kalır; spam abuse riski düşük (admin tanıdıklarını filtreler)
+
+**Sonuçlar / Trade-off'lar:**
+- (+) UI basit (arkadaş listesi yerine "tüm üyeler")
+- (+) Network-effect: yeni üye anında herkese erişebilir
+- (−) İleride istenirse engelleme/sessize alma (block/mute) eklenebilir — ADR-013 supersede edilmez
+- ⚠️ Spam yaşanırsa: rate limit DM endpoint'inde (T-031'de değerlendirilir)
+
+---
+
+## ADR-012 — DM Mesaj Şifreleme: AES-256-GCM At-Rest, Server-Side Key
+
+- **Tarih:** 2026-05-09
+- **Durum:** Kabul edildi
+- **Karar verenler:** AppSec, SecOps, Senior Dev #1, Senior Dev #2, Tech Lead
+
+**Bağlam:**
+ADR-005'te server-side encryption seçildi (E2E değil). Sprint #4'te DM tablosu kuruluyor — `messages.body` plain text mi, encrypted mi, hangi algoritma?
+
+**Değerlendirilen Seçenekler:**
+1. Plain text (TLS in-transit yeter) — mahremiyet katmansız
+2. AES-256-CBC + HMAC — manuel auth, hata-yatkın
+3. AES-256-GCM (auth-encrypt) — modern AEAD, .NET built-in
+4. ChaCha20-Poly1305 — alternatif AEAD, .NET 8+ destekli
+
+**Karar:**
+Seçenek 3 — AES-256-GCM at-rest.
+
+**Rationale:**
+- DB compromise senaryosunda mesaj plain text okunamaz (key ayrı env'de)
+- AES-GCM authenticate-encrypt: tampering otomatik tespit
+- .NET `System.Security.Cryptography.AesGcm` built-in (no extra package)
+- Per-message random IV (12 byte), key sabit (32 byte env'den)
+- ChaCha20 da seçenek ama AES-GCM daha yaygın test edilmiş
+
+**Implementation:**
+- `Crypto:MessageKey` env: 32 byte base64 (server-side `openssl rand -base64 32`)
+- Schema: `messages.iv` (bytea 12), `messages.ciphertext` (bytea), `messages.tag` (bytea 16)
+- `IMessageCrypto.Encrypt(plaintext) → (iv, ciphertext, tag)`, `Decrypt(...) → plaintext`
+- Encrypt = sender side server'da (controller içinde, request body plaintext)
+- Decrypt = server'da read sırasında (controller response body plaintext)
+
+**Sonuçlar / Trade-off'lar:**
+- (+) DB-only sızıntıda mesajlar güvenli (key ayrı)
+- (+) AEAD ile tamper detect (saldırgan ciphertext değiştirirse decrypt fails)
+- (+) E2E'ye göre çok-cihaz senkron sorunsuz (server elinde key)
+- (−) Server compromise (env+DB) → mesajlar açılır (kabul edilen risk, ADR-005)
+- (−) Key rotation: mevcut mesajlar eski key'le saklanır → key versioning patterni Sprint #5+'te düşünülür
+- ⚠️ Anahtar `.env.prod`'dan kaybolursa eski mesajlar kalıcı kayıp — backup şart (env file Hetzner snapshot'ında var)
+
+---
+
 ## ADR-011 — Rate Limit Stratejisi (in-memory fixed-window) + Compose Service Naming + Email Fallback
 
 - **Tarih:** 2026-05-09

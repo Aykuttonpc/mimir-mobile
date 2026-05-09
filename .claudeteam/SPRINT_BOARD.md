@@ -5,10 +5,31 @@
 
 ## Aktif Sprint
 
-- **Sprint:** #3 — Mobile MVP + Hardening
-- **Başlangıç:** 2026-05-09 (Sprint #2 kapandı)
+- **Sprint:** #4 — Messaging (DM altyapısı)
+- **Başlangıç:** 2026-05-09 (Sprint #3 kapandı aynı gün — backend + mobile MVP eş zamanlı bitti)
 - **Hedef bitiş:** [kullanıcı tempo verir]
-- **Sprint hedefi:** KMP + Compose Multiplatform Android iskelet, eski Java/Firebase mobile kodu temizliği, nginx /mimir/ patch'in AykutOnPC repo'sunda kalıcılaştırılması. Sprint sonunda: Android APK'da login + admin onay flow + JWT işleyen iskelet ekran.
+- **Sprint hedefi:** 1-1 Direct Message altyapısı uçtan uca: backend `messages` tablosu + AES-256-GCM at-rest şifreleme + REST endpoints + SignalR Hub real-time push + Mobile ChatList/ChatScreen + Active kullanıcılar arası serbest DM. Push notification kararı bu sprint başında alınır (APNs+FCM-direct vs OneSignal).
+
+## ✅ Sprint #3 KAPANDI (2026-05-09)
+
+**Hedef:** KMP-ready Android Compose iskelet + eski Java/Firebase temizlik + nginx kalıcılaştırma.
+**Sonuç:** **Mobile MVP production-ready** — APK'da end-to-end auth flow + admin paneli + register + şifre değiştirme + gerçek email gönderimi (iCloud SMTP) çalışıyor.
+
+| Hedef | Durum |
+|---|---|
+| nginx /mimir/ patch AykutOnPC repo'sunda commit | ✅ T-018 |
+| KMP-ready Android Compose iskelet (`:app` + `:data`) | ✅ T-011 |
+| Java/Firebase eski kod tam temizlik | ✅ T-019 |
+| RegisterScreen + EmailSentScreen + Login linki | ✅ T-022 |
+| Admin Paneli (davet üret + onay/red + share) | ✅ T-026 |
+| Real SMTP (iCloud, MailKit 4.16) — gerçek email | ✅ T-023 |
+| Admin/user şifre değiştirme + refresh token revoke | ✅ T-024 |
+
+### Sprint #3 deferred (Sprint #4+'a)
+- T-017 Cert pinning (P2 — LE cert var, opsiyonel ek katman)
+- T-025 Redis-distributed rate limit (multi-replica öncesi yetiyor in-memory)
+
+---
 
 ## ✅ Sprint #2 KAPANDI (2026-05-09)
 
@@ -35,17 +56,19 @@
 
 ---
 
-## 📋 Todo (Sprint #3)
+## 📋 Todo (Sprint #4 — Messaging)
 
 | ID | Başlık | Sahip | Tahmin | Notlar |
 |---|---|---|---|---|
-| T-011 | KMP + Compose Multiplatform iskelet proje (**Android-only**) | Senior Dev #3 + Innovation Architect | 1-2 gün | Yeni branch `kmp-rewrite`. Login screen iskeleti, JWT storage, OkHttp + Retrofit (KMP) ile mimir-api bağlantısı |
-| T-019 | Eski Java/Firebase Android kodu temizliği | Senior Dev #3 | 0.5 gün | Mevcut JavaInstagramClone repo'sundaki Firebase/Picasso/Java kod silinir. Repo `instaclone-mobile` (sonra `mimir-mobile`)'a rename |
-| T-022 | Login + Pending screen + Approve flow UI | Senior Dev #3 | 1-2 gün | Davet token entry → register → email verify (manual link tıklama) → "admin onayı bekleniyor" → login → home |
-| T-023 | Real SMTP konfigürasyonu (production email) | DevOps + Senior Dev #1 | 30 dk | `Smtp__Host` env set; provider seç (Gmail SMTP / SendGrid / Mailgun). ConsoleEmailSender → SmtpEmailSender otomatik geçecek. |
-| T-017 | Mobile app cert pinning (P2 → opsiyonel) | Senior Dev #3 + AppSec | 1 saat | LE cert üzerinde — MITM koruması için ek katman. Cert rotation = APK rebuild. P2 düşük öncelik. |
-| T-024 | Bootstrap admin password değiştirme endpoint'i (ya da SQL) | AppSec + Senior Dev #1 | 30 dk | İlk login sonrası admin şifresini değiştirebilmek lazım — şu an manuel SQL UPDATE gerek. POST /api/auth/change-password endpoint. |
-| T-025 | Multi-replica hazırlık: Redis-distributed rate limit | AppSec + Senior Dev #1 | 2 saat | Şu an in-memory single-instance. ASP.NET Core'un Redis-based partition store impl edilmeli (multi-replica deploy gerekirse) |
+| T-027 | `Message` entity + AES-256-GCM crypto + 5. EF migration | Senior Dev #2 + AppSec | 2 saat | sender_id, recipient_id, iv, ciphertext, tag, created_at, read_at, edited_at, deleted_at. `IMessageCrypto` + `AesGcmMessageCrypto` impl. Key env'den (`Crypto:MessageKey`, 32 byte base64). |
+| T-028 | `MessagesController` REST endpoints | Senior Dev #1 | 3 saat | `GET /api/messages/conversations` (özet liste + unread), `GET /api/messages/with/{userId}` (sayfalı tarih), `POST /api/messages/with/{userId}` (yeni mesaj fallback), `POST /api/messages/{id}/read` (read receipt) |
+| T-029 | SignalR `DmHub` real-time push | Senior Dev #1 + Innovation Architect | 3 saat | OnConnected: `Groups.AddToGroup($"user-{userId}")`. `SendMessage(toUserId, plaintext)` → encrypt → DB save → `Clients.Group("user-{recipient}").MessageReceived(...)`. Read receipt invoke. |
+| T-032 | `GET /api/users/active` (dm partner listesi) | Senior Dev #1 | 30 dk | Active kullanıcı listesi. Mimir kapalı network — herkes herkese DM (arkadaş ekleme modeli yok, ADR-013). Pagination + arama. |
+| T-030 | Mobile ChatListScreen | Senior Dev #3 | 4 saat | Conversations API + LazyColumn + last-message preview + unread badge. Pull-to-refresh. |
+| T-031 | Mobile ChatScreen + SignalR client | Senior Dev #3 + Innovation Architect | 6-8 saat | KMP-uyumlu SignalR client (Microsoft.SignalR.Client veya WebSocket fallback). Mesaj listesi + send + read receipt + typing indicator. JWT auth via query string `access_token`. |
+| T-036 | Push notification kararı (brief) | ML/RAG Engineer + AppSec + Innovation Architect | 1 saat | APNs+FCM-direct (kendi backend'imizden push) vs OneSignal (3rd-party SaaS). Self-host network için APNs+FCM-direct uyar; iOS Sprint #6'da etkinleşir. Brief + ADR. |
+| T-033 | Read receipts + typing indicator (Sprint sonu) | Senior Dev #1 + Senior Dev #3 | 2 saat | DM Hub'a `Typing(toUserId, isTyping)` ve `Read(messageIds)` invoke ekle. Mobile UI'da göster. |
+| T-035 | Message edit / soft delete | Senior Dev #1 | 1.5 saat | `PUT /api/messages/{id}` (edit), `DELETE /api/messages/{id}` (soft — DeletedAt set). Sadece sender. Mobile UI: long-press menü. |
 
 ## 🚧 In Progress
 
@@ -78,7 +101,13 @@
 | T-009 | 3-aşama onboarding endpoint'leri | 2026-05-09 | 8 endpoint çalışıyor: register/verify-email/login/refresh/logout + admin invitations/users-pending/approve. End-to-end smoke test başarılı. RBAC (admin policy) çalışıyor. JWT access + refresh rotation + reuse detection. |
 | T-014 | Rate limit (in-memory fixed window) | 2026-05-09 | 4 policy: auth-register (5/dk), auth-login (10/dk), auth-verify (30/dk), admin-invite (20/dk). Smoke test'te 10. login fail'de 429 döndü ✅ (ADR-011). |
 | T-Hardening | Sprint #2 hardening: SmtpEmailSender + DataProtection-Keys volume + compose service rename + ForwardedHeaders | 2026-05-09 | Ek paket MailKit 4.16.0 (vulnerability fix), DP-Keys volume + Dockerfile chown, service `web`→`api` (alias fix), Docker subnetleri ForwardedHeaders trust |
-| T-018 | nginx `/mimir/` patch'in AykutOnPC repo'sunda kalıcılaştırılması | 2026-05-09 | AykutOnPC commit `7c58362` (`feat(nginx): /mimir/ location...`), GitHub Actions auto-deploy ~2 dk içinde uyguladı. Artık her deploy'da git tracked, silinmez. /mimir/health 200 + AykutOnPC root 200 (ikisi de stabil). |
+| T-018 | nginx `/mimir/` patch'in AykutOnPC repo'sunda kalıcılaştırılması | 2026-05-09 | AykutOnPC commit `7c58362`, GitHub Actions auto-deploy ~2 dk içinde uyguladı. Artık her deploy'da git tracked, silinmez. |
+| T-011 | KMP-ready Android Compose iskelet | 2026-05-09 | `:app` (Compose UI) + `:data` (Ktor + models) modüller. Branch `kmp-rewrite`. APK build. Login + Pending + Home + Register + EmailSent screens. |
+| T-019 | Eski Java/Firebase Android kodu temizliği | 2026-05-09 | Tüm `app/src/main/java/com/aykutcincik/javainstagramclone/*` + Firebase BOM + Picasso + google-services.json + eski layout XML'leri silindi. Branch `kmp-rewrite`'a Kotlin-only. |
+| T-022 | Register + EmailSent UI + LoginScreen entry link | 2026-05-09 | RegisterScreen (davet token + email + username + password + opsiyonel telefon + validation). EmailSentScreen (verify-email talimat). |
+| T-026 | Admin Paneli mobile UI | 2026-05-09 | AdminScreen: davet üret kartı (note + expiryDays + copy/share Android intent) + bekleyen kullanıcı listesi (onayla/reddet + Toast). AdminApi sınıfı (token-bound). |
+| T-023 | Real SMTP (iCloud) | 2026-05-09 | MailKit 4.16.0 + SmtpEmailSender. `Smtp:Host=smtp.mail.me.com`, `:Port=587`. Smoke test: `aykutcincik+mimirtest@icloud.com` adresine register sonrası email gönderildi (log'da `Email gönderildi`). |
+| T-024 | `POST /api/auth/change-password` + ChangePasswordScreen | 2026-05-09 | Backend: BCrypt verify + new ≠ old check + tüm refresh token revoke. Mobile: HomeScreen → ChangePasswordScreen → success → logout. Test: 4 validation path doğrulandı (yanlış current → 400, same → 400, kısa → 400, no-auth → 401). |
 
 ---
 
@@ -97,8 +126,9 @@
 - **Domain alımı + Let's Encrypt cert** (eski T-012/T-013) — `aykutonpc.com` zaten canlı, mevcut cert kullanılıyor. Sub-domain ihtiyacı doğarsa açılır.
 - **SMS verification + provider** (eski T-010) — ADR-010 ile iptal. Opt-in 2FA (TOTP/WebAuthn) ileride değerlendirilebilir.
 
-## Bloklayıcılar (Sprint #3)
+## Bloklayıcılar (Sprint #4)
 
-- ~~**T-018 BLOCKING T-022**~~ → **çözüldü 2026-05-09**: AykutOnPC repo'sunda kalıcı.
-- **T-022 → T-011 + T-019**: UI öncesi KMP iskelet ve eski kod temizliği.
-- iOS toolchain (Sprint #6 öncesi): macOS erişimi netleşmemiş — kullanıcıdan teyit alınacak.
+- **T-029 → T-027 + T-028**: SignalR Hub mesaj DB schema'sı ve REST endpoint'leri olmadan kurulamaz.
+- **T-031 → T-029**: Mobile real-time chat hub canlı olmadan çalışmaz.
+- **T-036 (push notification brief) → T-031 sonrası**: client tarafı çalışırken brief paralel gidebilir.
+- iOS toolchain (Sprint #6 öncesi): macOS erişimi hâlâ netleşmemiş.
