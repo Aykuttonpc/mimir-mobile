@@ -26,9 +26,15 @@ object Notifications {
         )
     }
 
-    // ADR-017: signal-only — içerik FCM'den gelmediği için generic mesaj.
-    // Tıklayınca MainActivity açılır, kullanıcı normal akışıyla ChatList → Chat'e gider.
-    fun showNewMessage(ctx: Context, senderUserId: String) {
+    // ADR-017: 2-aşamalı bildirim. Title = senderUsername (FCM payload'dan, hızlı),
+    // text = mesaj önizlemesi (mobile API'den çekildikten sonra update).
+    // İçerik FCM'e gitmediği için Google sadece "Mimir push var" görür, mesajı görmez.
+    fun showNewMessage(
+        ctx: Context,
+        senderUserId: String,
+        senderUsername: String,
+        contentPreview: String? = null,
+    ) {
         ensureChannel(ctx)
 
         val openIntent = Intent(ctx, MainActivity::class.java).apply {
@@ -40,10 +46,14 @@ object Notifications {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
+        val title = senderUsername.ifBlank { "Mimir" }
+        val text = contentPreview?.takeIf { it.isNotBlank() } ?: "Yeni mesajın var"
+
         val notif = NotificationCompat.Builder(ctx, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_email)
-            .setContentTitle("Mimir")
-            .setContentText("Yeni mesajın var")
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(pi)
@@ -53,8 +63,6 @@ object Notifications {
         runCatching {
             NotificationManagerCompat.from(ctx).notify(senderUserId.hashCode(), notif)
         }
-        // SecurityException olabilir (POST_NOTIFICATIONS izni Android 13+ runtime).
-        // Sessiz geç — kullanıcı uygulama açtığında zaten mesajları görecek.
     }
 
     const val EXTRA_OPEN_PEER_USER_ID = "open_peer_user_id"
