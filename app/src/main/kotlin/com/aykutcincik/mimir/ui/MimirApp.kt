@@ -8,7 +8,7 @@ import androidx.compose.runtime.setValue
 
 /**
  * Sprint #3 iskelet — minimal navigation state-machine.
- * Sprint sonu öncesi Navigation Compose'a taşı (T-022 detayı).
+ * Sprint sonu öncesi Navigation Compose'a taşı.
  */
 sealed interface Screen {
     data object Login : Screen
@@ -17,6 +17,7 @@ sealed interface Screen {
     data class Pending(val username: String) : Screen
     data class Home(val username: String, val isAdmin: Boolean, val accessToken: String) : Screen
     data class Admin(val accessToken: String, val username: String, val isAdmin: Boolean) : Screen
+    data class ChangePassword(val accessToken: String, val username: String, val isAdmin: Boolean) : Screen
 }
 
 @Composable
@@ -54,10 +55,16 @@ fun MimirApp() {
             onOpenAdmin = if (s.isAdmin) {
                 { screen = Screen.Admin(s.accessToken, s.username, s.isAdmin) }
             } else null,
+            onChangePassword = { screen = Screen.ChangePassword(s.accessToken, s.username, s.isAdmin) },
         )
         is Screen.Admin -> AdminScreen(
             accessToken = s.accessToken,
             onBack = { screen = Screen.Home(s.username, s.isAdmin, s.accessToken) },
+        )
+        is Screen.ChangePassword -> ChangePasswordScreen(
+            accessToken = s.accessToken,
+            onBack = { screen = Screen.Home(s.username, s.isAdmin, s.accessToken) },
+            onSuccessRequireRelogin = { screen = Screen.Login },
         )
     }
 }

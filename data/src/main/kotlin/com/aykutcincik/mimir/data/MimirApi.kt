@@ -8,9 +8,11 @@ import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.http.HttpHeaders
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
@@ -72,6 +74,21 @@ class MimirApi(
             ApiResult.Success(Unit)
         else
             ApiResult.Error(resp.status.value)
+    }.getOrElse { ApiResult.Failure(it) }
+
+    /** Authenticated — accessToken Bearer header'ında gider. T-024 */
+    suspend fun changePassword(accessToken: String, current: String, new: String): ApiResult<Unit> = runCatching {
+        val resp: HttpResponse = client.post("api/auth/change-password") {
+            header(HttpHeaders.Authorization, "Bearer $accessToken")
+            setBody(ChangePasswordRequest(current, new))
+        }
+        when (resp.status.value) {
+            in 200..299 -> ApiResult.Success(Unit)
+            else -> {
+                val key = runCatching { resp.body<ApiErrorBody>().error }.getOrNull()
+                ApiResult.Error(resp.status.value, key)
+            }
+        }
     }.getOrElse { ApiResult.Failure(it) }
 
     // ─────────────────────── Helpers ────────────────────────────────

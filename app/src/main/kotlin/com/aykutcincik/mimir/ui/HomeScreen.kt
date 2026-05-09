@@ -6,12 +6,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +29,7 @@ fun HomeScreen(
     isAdmin: Boolean,
     onLogout: () -> Unit,
     onOpenAdmin: (() -> Unit)? = null,
+    onChangePassword: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -47,7 +50,7 @@ fun HomeScreen(
             Spacer(Modifier.height(8.dp))
             AssistChip(
                 onClick = { onOpenAdmin?.invoke() },
-                label = { Text("Admin Paneli") },
+                label = { Text("Admin") },
                 colors = AssistChipDefaults.assistChipColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 ),
@@ -64,6 +67,8 @@ fun HomeScreen(
             Button(onClick = onOpenAdmin) { Text("Admin Paneli") }
             Spacer(Modifier.height(12.dp))
         }
+        TextButton(onClick = onChangePassword) { Text("Şifre değiştir") }
+        Spacer(Modifier.height(8.dp))
         OutlinedButton(onClick = onLogout) { Text("Çıkış") }
     }
 }

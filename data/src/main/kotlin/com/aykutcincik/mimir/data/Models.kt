@@ -48,6 +48,12 @@ data class VerifyEmailResponse(
     @SerialName("message") val message: String,
 )
 
+@Serializable
+data class ChangePasswordRequest(
+    @SerialName("currentPassword") val currentPassword: String,
+    @SerialName("newPassword") val newPassword: String,
+)
+
 // ─────────────────────── Admin ─────────────────────
 
 @Serializable
