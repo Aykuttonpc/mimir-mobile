@@ -28,6 +28,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -38,16 +39,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aykutcincik.mimir.data.ApiResult
 import com.aykutcincik.mimir.data.MessageDto
 import com.aykutcincik.mimir.data.MessagingApi
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
+import com.aykutcincik.mimir.realtime.RealtimeClient
 import kotlinx.coroutines.launch
-
-private const val POLLING_INTERVAL_MS = 5000L
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,6 +57,7 @@ fun ChatScreen(
 ) {
     val scope = rememberCoroutineScope()
     val api = remember(accessToken) { MessagingApi(accessToken) }
+    val realtime = remember(accessToken) { RealtimeClient(accessToken) }
 
     val messages = remember { mutableStateListOf<MessageDto>() }
     val seenIds = remember { mutableSetOf<String>() }
@@ -67,39 +65,71 @@ fun ChatScreen(
     var sending by remember { mutableStateOf(false) }
     var initialLoading by remember { mutableStateOf(true) }
     var errorText by remember { mutableStateOf<String?>(null) }
+    var connected by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
-    suspend fun fetch(initial: Boolean = false) {
+    // İlk yükleme + SignalR connect
+    LaunchedEffect(peerUserId) {
+        // 1) Initial REST fetch
         when (val r = api.messagesWith(peerUserId, limit = 50)) {
             is ApiResult.Success -> {
-                // Sıralama: server reverse → chronological (eski → yeni)
-                val newOnes = r.value.filter { it.id !in seenIds }
-                if (newOnes.isNotEmpty()) {
-                    seenIds.addAll(newOnes.map { it.id })
-                    if (initial) {
-                        messages.clear()
-                        messages.addAll(r.value)
-                    } else {
-                        messages.addAll(newOnes.filter { m -> messages.none { it.id == m.id } })
+                messages.clear()
+                seenIds.clear()
+                messages.addAll(r.value)
+                seenIds.addAll(r.value.map { it.id })
+                // Auto mark-as-read peer mesajları için
+                r.value.filter { it.senderId == peerUserId && it.readAt == null }
+                    .forEach { api.markAsRead(it.id) }
+            }
+            is ApiResult.Error -> errorText = "Mesajlar alınamadı (HTTP ${r.code})"
+            is ApiResult.Failure -> errorText = "Bağlantı hatası: ${r.cause.message}"
+        }
+        initialLoading = false
+
+        // 2) SignalR start
+        realtime.start()
+
+        // 3) Event collect
+        realtime.events.collect { ev ->
+            when (ev) {
+                is RealtimeClient.RealtimeEvent.Connected -> connected = true
+                is RealtimeClient.RealtimeEvent.Disconnected -> connected = false
+                is RealtimeClient.RealtimeEvent.Received -> {
+                    val m = ev.msg
+                    // Sadece bu peer ile ilgili mesajlar
+                    if ((m.senderId == peerUserId || m.recipientId == peerUserId) && m.id !in seenIds) {
+                        seenIds.add(m.id)
+                        messages.add(m)
+                        // Peer'dan gelen unread → otomatik mark-as-read
+                        if (m.senderId == peerUserId && m.readAt == null) {
+                            scope.launch { api.markAsRead(m.id) }
+                        }
                     }
-                    // Otomatik mark-as-read: peer'dan gelen unread mesajları
-                    newOnes.filter { it.recipientId == currentUserId && it.readAt == null }
-                        .forEach { api.markAsRead(it.id) }
+                }
+                is RealtimeClient.RealtimeEvent.Sent -> {
+                    val m = ev.msg
+                    // Sender'in başka cihazından gönderim → bu peer ile ilgiliyse listeye ekle
+                    if (m.recipientId == peerUserId && m.id !in seenIds) {
+                        seenIds.add(m.id)
+                        messages.add(m)
+                    }
+                }
+                is RealtimeClient.RealtimeEvent.Read -> {
+                    // Bu sohbette ben gönderdiğim mesaj okundu → readAt update
+                    val idx = messages.indexOfFirst { it.id == ev.event.messageId }
+                    if (idx >= 0) {
+                        messages[idx] = messages[idx].copy(readAt = ev.event.readAt)
+                    }
+                }
+                is RealtimeClient.RealtimeEvent.Error -> {
+                    // Hub fail → user görmez, polling fallback yok şu an. Sprint #5 sonu eklenebilir.
                 }
             }
-            is ApiResult.Error -> { if (initial) errorText = "Mesajlar alınamadı (HTTP ${r.code})" }
-            is ApiResult.Failure -> { if (initial) errorText = "Bağlantı hatası: ${r.cause.message}" }
         }
     }
 
-    LaunchedEffect(peerUserId) {
-        fetch(initial = true)
-        initialLoading = false
-        // Polling
-        while (isActive) {
-            delay(POLLING_INTERVAL_MS)
-            fetch(initial = false)
-        }
+    DisposableEffect(realtime) {
+        onDispose { scope.launch { realtime.stop() } }
     }
 
     LaunchedEffect(messages.size) {
@@ -109,7 +139,17 @@ fun ChatScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("@$peerUsername") },
+                title = {
+                    Column {
+                        Text("@$peerUsername")
+                        Text(
+                            text = if (connected) "● bağlı" else "○ bağlanıyor…",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (connected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
@@ -163,6 +203,7 @@ fun ChatScreen(
                         scope.launch {
                             when (val r = api.sendMessage(peerUserId, content)) {
                                 is ApiResult.Success -> {
+                                    // Mesajı listeye ekle (SignalR Sent event'i de gelir ama duplicate korur seenIds)
                                     if (r.value.id !in seenIds) {
                                         seenIds.add(r.value.id)
                                         messages.add(r.value)
@@ -209,7 +250,6 @@ private fun MessageBubble(m: MessageDto, isMine: Boolean) {
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
-        // Read receipt: ben gönderdim + readAt set
         if (isMine && m.readAt != null) {
             Text(
                 text = "okundu",

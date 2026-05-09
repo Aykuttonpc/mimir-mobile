@@ -134,6 +134,12 @@ data class SendMessageRequest(
     @SerialName("content") val content: String,
 )
 
+@Serializable
+data class MessageReadEvent(
+    @SerialName("messageId") val messageId: String,
+    @SerialName("readAt") val readAt: String,
+)
+
 // ─────────────────────── App version (T-039) ────────
 
 @Serializable

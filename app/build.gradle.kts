@@ -77,6 +77,10 @@ dependencies {
 
     // Coroutines (Android dispatcher)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.rx3)
+
+    // SignalR Java client (T-037 real-time DM) — Android-only şu an, Sprint #6 KMP refactor
+    implementation(libs.microsoft.signalr)
 
     testImplementation(libs.junit)
 }

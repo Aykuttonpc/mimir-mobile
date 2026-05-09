@@ -16,6 +16,9 @@ ktor = "3.0.1"
 kotlinxSerialization = "1.7.3"
 kotlinxCoroutines = "1.9.0"
 
+# Real-time
+signalr = "8.0.0"
+
 # Test
 junit = "4.13.2"
 
@@ -51,6 +54,10 @@ ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 kotlinx-coroutines-core    = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core",    version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
+kotlinx-coroutines-rx3     = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-rx3",     version.ref = "kotlinxCoroutines" }
+
+# SignalR Java client (T-037)
+microsoft-signalr = { module = "com.microsoft.signalr:signalr", version.ref = "signalr" }
 
 # Test
 junit = { group = "junit", name = "junit", version.ref = "junit" }
