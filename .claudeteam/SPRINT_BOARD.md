@@ -5,10 +5,34 @@
 
 ## Aktif Sprint
 
-- **Sprint:** #4 — Messaging (DM altyapısı)
-- **Başlangıç:** 2026-05-09 (Sprint #3 kapandı aynı gün — backend + mobile MVP eş zamanlı bitti)
+- **Sprint:** #5 — Real-time + Push + Mesaj UX
+- **Başlangıç:** 2026-05-09 (Sprint #4 kapandı aynı gün)
 - **Hedef bitiş:** [kullanıcı tempo verir]
-- **Sprint hedefi:** 1-1 Direct Message altyapısı uçtan uca: backend `messages` tablosu + AES-256-GCM at-rest şifreleme + REST endpoints + SignalR Hub real-time push + Mobile ChatList/ChatScreen + Active kullanıcılar arası serbest DM. Push notification kararı bu sprint başında alınır (APNs+FCM-direct vs OneSignal).
+- **Sprint hedefi:** Polling'i SignalR'a çevir (real-time DM), push notification altyapısı kur (cihaz kapalıyken bildirim), mesaj edit/soft delete UX'i. Kullanıcı hissi: "WhatsApp-class" anlık + her cihazda tutarlı.
+
+## ✅ Sprint #4 KAPANDI (2026-05-09)
+
+**Hedef:** 1-1 DM uçtan uca + AES-256-GCM at-rest + Mobile ChatList/ChatScreen.
+**Sonuç:** **Backend + Mobile DM canlı**. Polling-based real-time hissi (5sn aralık), AES-GCM round-trip OK, kullanıcı `aykut` mobile'dan alice'e mesaj gönderdi, sohbet listesi + balonlar çalışıyor.
+
+| Hedef | Durum |
+|---|---|
+| `Message` entity + AES-256-GCM crypto + 5. migration | ✅ T-027 |
+| `MessagesController` 4 REST endpoint | ✅ T-028 |
+| `DmHub` (SignalR — backend hazır, mobile polling kullanıyor) | ✅ T-029 (backend) |
+| `UsersController` active users list | ✅ T-032 |
+| `ChatListScreen` + conversations + unread badge + FAB | ✅ T-030 |
+| `ChatScreen` + polling 5sn + auto mark-as-read + okundu badge | ✅ T-031 |
+| Read receipts UI (kısmen) | ✅ T-033 partial |
+| `NewChatScreen` active user picker + debounced search | ✅ |
+
+### Sprint #4 deferred → Sprint #5
+- SignalR mobile client (polling'i değiştir, T-029 mobile yarısı)
+- T-034 Push notifications (cihaz kapalıyken)
+- T-036 Push provider brief (APNs+FCM-direct vs OneSignal)
+- T-035 Message edit + soft delete
+
+---
 
 ## ✅ Sprint #3 KAPANDI (2026-05-09)
 
@@ -56,19 +80,18 @@
 
 ---
 
-## 📋 Todo (Sprint #4 — Messaging)
+## 📋 Todo (Sprint #5 — Real-time + Push + UX)
 
 | ID | Başlık | Sahip | Tahmin | Notlar |
 |---|---|---|---|---|
-| T-027 | `Message` entity + AES-256-GCM crypto + 5. EF migration | Senior Dev #2 + AppSec | 2 saat | sender_id, recipient_id, iv, ciphertext, tag, created_at, read_at, edited_at, deleted_at. `IMessageCrypto` + `AesGcmMessageCrypto` impl. Key env'den (`Crypto:MessageKey`, 32 byte base64). |
-| T-028 | `MessagesController` REST endpoints | Senior Dev #1 | 3 saat | `GET /api/messages/conversations` (özet liste + unread), `GET /api/messages/with/{userId}` (sayfalı tarih), `POST /api/messages/with/{userId}` (yeni mesaj fallback), `POST /api/messages/{id}/read` (read receipt) |
-| T-029 | SignalR `DmHub` real-time push | Senior Dev #1 + Innovation Architect | 3 saat | OnConnected: `Groups.AddToGroup($"user-{userId}")`. `SendMessage(toUserId, plaintext)` → encrypt → DB save → `Clients.Group("user-{recipient}").MessageReceived(...)`. Read receipt invoke. |
-| T-032 | `GET /api/users/active` (dm partner listesi) | Senior Dev #1 | 30 dk | Active kullanıcı listesi. Mimir kapalı network — herkes herkese DM (arkadaş ekleme modeli yok, ADR-013). Pagination + arama. |
-| T-030 | Mobile ChatListScreen | Senior Dev #3 | 4 saat | Conversations API + LazyColumn + last-message preview + unread badge. Pull-to-refresh. |
-| T-031 | Mobile ChatScreen + SignalR client | Senior Dev #3 + Innovation Architect | 6-8 saat | KMP-uyumlu SignalR client (Microsoft.SignalR.Client veya WebSocket fallback). Mesaj listesi + send + read receipt + typing indicator. JWT auth via query string `access_token`. |
-| T-036 | Push notification kararı (brief) | ML/RAG Engineer + AppSec + Innovation Architect | 1 saat | APNs+FCM-direct (kendi backend'imizden push) vs OneSignal (3rd-party SaaS). Self-host network için APNs+FCM-direct uyar; iOS Sprint #6'da etkinleşir. Brief + ADR. |
-| T-033 | Read receipts + typing indicator (Sprint sonu) | Senior Dev #1 + Senior Dev #3 | 2 saat | DM Hub'a `Typing(toUserId, isTyping)` ve `Read(messageIds)` invoke ekle. Mobile UI'da göster. |
-| T-035 | Message edit / soft delete | Senior Dev #1 | 1.5 saat | `PUT /api/messages/{id}` (edit), `DELETE /api/messages/{id}` (soft — DeletedAt set). Sadece sender. Mobile UI: long-press menü. |
+| T-037 | SignalR mobile client (polling → real-time) | Senior Dev #3 + Innovation Architect | 4-6 saat | `com.microsoft.signalr:signalr:8.0.0` (Java client, Android-only) — KMP'de Sprint #6 öncesi placeholder, Android tarafına entegrasyon. JWT via query `access_token`. Hub reconnect logic. ChatScreen polling'i değiştir (event-driven). |
+| T-036 | Push notification brief + ADR-014 | Tech Radar Engineer + AppSec + Innovation Architect | 1 saat | APNs+FCM-direct (self-host) vs OneSignal (SaaS). Decision matrix: setup karmaşıklığı, iOS uyumu, KVKK 3rd-party data flow, maliyet. ADR yaz. |
+| T-034 | Push notification implementation | Senior Dev #1 + Senior Dev #3 | 6-8 saat | T-036 sonrası seçilen provider'a göre. Backend: yeni mesaj olunca push send. Mobile: device token kayıt endpoint'i + notification handler. iOS Sprint #6'da. |
+| T-035 | Message edit + soft delete | Senior Dev #1 + Senior Dev #3 | 2-3 saat | `PATCH /api/messages/{id}` (edit, sadece sender, EditedAt set), `DELETE /api/messages/{id}` (soft, DeletedAt). Mobile: long-press menü → düzenle/sil. Edit'lenen mesajda "düzenlendi" badge. |
+| T-033 | Typing indicator (DmHub `Typing` invoke + UI) | Senior Dev #3 | 1-2 saat | DmHub'a `Typing(toUserId, isTyping)` zaten var. Mobile ChatScreen'de "..." göster. T-037 sonrası kolay. |
+| T-038 | Auto-login (DataStore'da JWT persist) | Senior Dev #3 | 1 saat | App açılışında DataStore'dan refresh token oku, `/auth/refresh` ile yeni access al, otomatik HomeScreen. Şu an her kapatış login'e dönüyor. |
+| T-039 | Force-update min version check | Senior Dev #1 + Senior Dev #3 | 1 saat | Backend env `MIN_APP_VERSION`. Login response'a ekle. Mobile: response'ta low version → blocking dialog "yeni APK indir". APK güvenlik patch'leri için kritik. |
+| T-017 | Cert pinning (P2 → opsiyonel) | Senior Dev #3 + AppSec | 1 saat | LE cert üzerinde — MITM ek katman. Cert rotation = APK rebuild. Yine P2. |
 
 ## 🚧 In Progress
 
@@ -108,6 +131,13 @@
 | T-026 | Admin Paneli mobile UI | 2026-05-09 | AdminScreen: davet üret kartı (note + expiryDays + copy/share Android intent) + bekleyen kullanıcı listesi (onayla/reddet + Toast). AdminApi sınıfı (token-bound). |
 | T-023 | Real SMTP (iCloud) | 2026-05-09 | MailKit 4.16.0 + SmtpEmailSender. `Smtp:Host=smtp.mail.me.com`, `:Port=587`. Smoke test: `aykutcincik+mimirtest@icloud.com` adresine register sonrası email gönderildi (log'da `Email gönderildi`). |
 | T-024 | `POST /api/auth/change-password` + ChangePasswordScreen | 2026-05-09 | Backend: BCrypt verify + new ≠ old check + tüm refresh token revoke. Mobile: HomeScreen → ChangePasswordScreen → success → logout. Test: 4 validation path doğrulandı (yanlış current → 400, same → 400, kısa → 400, no-auth → 401). |
+| T-027 | Message entity + AES-256-GCM crypto + 5. migration | 2026-05-09 | `messages` tablosu canlı, key env'den (32 byte). |
+| T-028 | MessagesController REST (4 endpoint) | 2026-05-09 | conversations, with/{id}, send, mark-read. AES-GCM round-trip smoke test başarılı (`Selam alice...` mesajı encrypt → DB → decrypt). |
+| T-029 (backend) | DmHub real-time + typing | 2026-05-09 | Group-per-user pattern, OnConnected/OnDisconnected, SendMessage/MarkAsRead/Typing. Mobile client Sprint #5'te (polling-replace). |
+| T-032 | UsersController active list + arama | 2026-05-09 | EF Functions Like substring search. Limit 1-200. Test: alice listede. |
+| T-030 | ChatListScreen | 2026-05-09 | Conversations LazyColumn + avatar initials + unread badge + FAB + Refresh. Empty state. |
+| T-031 | ChatScreen + polling 5sn | 2026-05-09 | LazyColumn + balon + auto-scroll-to-bottom + auto mark-as-read + send + okundu badge. SignalR client Sprint #5'te. |
+| T-033 partial | Read receipt UI | 2026-05-09 | Auto mark-as-read açıkken peer mesajlarını okur, "okundu" badge sender mesajlarında ReadAt set olunca görünür. Typing T-037 sonrası. |
 
 ---
 
@@ -126,9 +156,8 @@
 - **Domain alımı + Let's Encrypt cert** (eski T-012/T-013) — `aykutonpc.com` zaten canlı, mevcut cert kullanılıyor. Sub-domain ihtiyacı doğarsa açılır.
 - **SMS verification + provider** (eski T-010) — ADR-010 ile iptal. Opt-in 2FA (TOTP/WebAuthn) ileride değerlendirilebilir.
 
-## Bloklayıcılar (Sprint #4)
+## Bloklayıcılar (Sprint #5)
 
-- **T-029 → T-027 + T-028**: SignalR Hub mesaj DB schema'sı ve REST endpoint'leri olmadan kurulamaz.
-- **T-031 → T-029**: Mobile real-time chat hub canlı olmadan çalışmaz.
-- **T-036 (push notification brief) → T-031 sonrası**: client tarafı çalışırken brief paralel gidebilir.
-- iOS toolchain (Sprint #6 öncesi): macOS erişimi hâlâ netleşmemiş.
+- **T-034 (push impl) → T-036 (provider brief)**: Hangi provider seçilmeden impl başlamaz.
+- **T-033 (typing) → T-037 (signalr client)**: Real-time hub kullanılmadan typing pratik değil.
+- iOS toolchain (Sprint #6 öncesi): macOS erişimi hâlâ netleşmemiş — push notification iOS tarafı bunu bekliyor.

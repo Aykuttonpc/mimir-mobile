@@ -4,7 +4,7 @@
 
 - **Proje adı:** **Mimir** (Norse mit. — bilgelik kuyusunun başı; ADR-009)
 - **Sahibi / paydaş:** Aykut (tek paydaş, admin)
-- **Durum:** **Backend + Mobile MVP production-ready** (Sprint #2 + #3 close 2026-05-09). Sprint #4 messaging başlangıcında.
+- **Durum:** **DM uçtan uca canlı** (Sprint #2-#3-#4 close 2026-05-09 — backend + mobile + auth + admin paneli + messaging). Sprint #5 real-time + push + UX.
 - **Aktif branch:** `kmp-rewrite` (mobile, Sprint #3 itibariyle Kotlin+Compose). Backend `mimir-api` master branch.
 - **URL:** `https://aykutonpc.com/mimir/` — Let's Encrypt cert üzerinden public erişim. Mobile-only, path prefix routing (ADR-007). `/mimir/health` canlı.
 - **Repolar:**
@@ -23,11 +23,11 @@ Aykut'un kapalı, kişisel iletişim ağı. Firebase bağımlılığı kaldırı
 ## Başarı Kriterleri
 
 - [ ] Yeni kullanıcı 3-aşama gate'ten geçer (email verify + admin onay) — ADR-010
-- [ ] DM mesaj iletim gecikmesi < 1 sn (SignalR ile real-time)
+- [x] DM çalışıyor (Sprint #4) — gecikme şu an 5sn (polling), Sprint #5'te SignalR ile <1sn'ye iner
 - [ ] Backend uptime > %99 (mevcut VPS uptime'ı baseline)
 - [ ] Android + iOS native uygulamada ortak codebase (KMP + Compose Multiplatform)
 - [ ] APK direkt distribution + force update mekanizması
-- [ ] Firebase SDK'larından %100 ayrılma (Auth/Firestore/Storage/Analytics → 0)
+- [x] Firebase SDK'larından %100 ayrılma (Sprint #3 T-019 — tüm Firebase BOM + Picasso silindi)
 
 ## Kısıtlar
 
