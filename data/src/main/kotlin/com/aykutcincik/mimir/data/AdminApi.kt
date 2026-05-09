@@ -3,6 +3,7 @@ package com.aykutcincik.mimir.data
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.HttpResponseValidator
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.logging.LogLevel
@@ -29,6 +30,7 @@ class AdminApi(
     baseUrl: String = MimirApi.DEFAULT_BASE_URL,
     private val appVersion: String = "0.0.0",
     private val appPlatform: String = "android",
+    private val onVersionGate: () -> Unit = {},
     enableLogging: Boolean = true,
 ) {
     private val json = Json {
@@ -49,6 +51,11 @@ class AdminApi(
         }
         install(ContentNegotiation) { json(this@AdminApi.json) }
         if (enableLogging) install(Logging) { level = LogLevel.INFO }
+        HttpResponseValidator {
+            validateResponse { response ->
+                if (response.status.value == 426) onVersionGate()
+            }
+        }
     }
 
     suspend fun createInvitation(req: InvitationCreateRequest): ApiResult<InvitationCreateResponse> =

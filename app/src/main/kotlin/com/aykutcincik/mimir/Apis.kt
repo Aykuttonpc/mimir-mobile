@@ -4,6 +4,7 @@ import com.aykutcincik.mimir.data.AdminApi
 import com.aykutcincik.mimir.data.FriendsApi
 import com.aykutcincik.mimir.data.MessagingApi
 import com.aykutcincik.mimir.data.MimirApi
+import com.aykutcincik.mimir.util.VersionGate
 
 /**
  * Tek noktadan API client factory — `BuildConfig.VERSION_NAME`'i her API'ye taşır.
@@ -16,8 +17,10 @@ object Apis {
     private val version: String get() = BuildConfig.VERSION_NAME
     private const val PLATFORM = "android"
 
-    fun mimir() = MimirApi(appVersion = version, appPlatform = PLATFORM)
-    fun admin(token: String) = AdminApi(accessToken = token, appVersion = version, appPlatform = PLATFORM)
-    fun messaging(token: String) = MessagingApi(accessToken = token, appVersion = version, appPlatform = PLATFORM)
-    fun friends(token: String) = FriendsApi(accessToken = token, appVersion = version, appPlatform = PLATFORM)
+    private val onGate: () -> Unit = { VersionGate.trigger() }
+
+    fun mimir() = MimirApi(appVersion = version, appPlatform = PLATFORM, onVersionGate = onGate)
+    fun admin(token: String) = AdminApi(accessToken = token, appVersion = version, appPlatform = PLATFORM, onVersionGate = onGate)
+    fun messaging(token: String) = MessagingApi(accessToken = token, appVersion = version, appPlatform = PLATFORM, onVersionGate = onGate)
+    fun friends(token: String) = FriendsApi(accessToken = token, appVersion = version, appPlatform = PLATFORM, onVersionGate = onGate)
 }

@@ -13,9 +13,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.collectAsState
 import com.aykutcincik.mimir.Apis
 import com.aykutcincik.mimir.data.ApiResult
 import com.aykutcincik.mimir.data.DataStoreTokenStorage
+import com.aykutcincik.mimir.util.VersionGate
 import kotlinx.coroutines.launch
 
 sealed interface Screen {
@@ -44,6 +46,22 @@ fun MimirApp() {
     val api = remember { Apis.mimir() }
 
     var screen: Screen by remember { mutableStateOf<Screen>(Screen.Bootstrap) }
+
+    // Global VersionGate — herhangi bir API client 426 görünce trigger olur,
+    // app-wide olarak ForceUpdateScreen'a yönlendirir.
+    val gateTriggered by VersionGate.triggered.collectAsState()
+    LaunchedEffect(gateTriggered) {
+        if (gateTriggered && screen !is Screen.ForceUpdate) {
+            storage.clear()
+            val info = (api.appVersion("android") as? ApiResult.Success)?.value
+            screen = Screen.ForceUpdate(
+                current = com.aykutcincik.mimir.BuildConfig.VERSION_NAME,
+                min = info?.minSupportedVersion ?: "0.0.0",
+                downloadUrl = info?.downloadUrl ?: "",
+            )
+            VersionGate.reset()
+        }
+    }
 
     LaunchedEffect(Unit) {
         // Force-update version check

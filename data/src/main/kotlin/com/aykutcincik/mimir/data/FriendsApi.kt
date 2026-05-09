@@ -3,6 +3,7 @@ package com.aykutcincik.mimir.data
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.HttpResponseValidator
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.delete
@@ -24,6 +25,7 @@ class FriendsApi(
     baseUrl: String = MimirApi.DEFAULT_BASE_URL,
     private val appVersion: String = "0.0.0",
     private val appPlatform: String = "android",
+    private val onVersionGate: () -> Unit = {},
 ) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = false }
 
@@ -37,6 +39,11 @@ class FriendsApi(
             header("X-App-Platform", appPlatform)
         }
         install(ContentNegotiation) { json(this@FriendsApi.json) }
+        HttpResponseValidator {
+            validateResponse { response ->
+                if (response.status.value == 426) onVersionGate()
+            }
+        }
     }
 
     // ─────────── /me ───────────
