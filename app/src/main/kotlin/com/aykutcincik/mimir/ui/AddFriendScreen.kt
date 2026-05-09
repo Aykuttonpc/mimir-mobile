@@ -8,18 +8,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.aykutcincik.mimir.ui.components.MimirPrimaryButton
+import com.aykutcincik.mimir.ui.components.MimirTopBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,7 +29,6 @@ import com.aykutcincik.mimir.Apis
 import com.aykutcincik.mimir.data.ApiResult
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddFriendScreen(
     accessToken: String,
@@ -49,18 +43,7 @@ fun AddFriendScreen(
     var errorText by remember { mutableStateOf<String?>(null) }
     var successText by remember { mutableStateOf<String?>(null) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Arkadaş Ekle") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
-                    }
-                },
-            )
-        },
-    ) { padding ->
+    Scaffold(topBar = { MimirTopBar(title = "Arkadaş Ekle", onBack = onBack) }) { padding ->
         Column(
             modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
             verticalArrangement = Arrangement.Top,
@@ -98,13 +81,13 @@ fun AddFriendScreen(
             }
 
             Spacer(Modifier.height(24.dp))
-            Button(
+            MimirPrimaryButton(
+                text = if (loading) "Gönderiliyor..." else "İstek Gönder",
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !loading,
                 onClick = {
                     val k = key.trim()
-                    if (k.length < 6) {
-                        errorText = "Geçerli bir anahtar gir."
-                        return@Button
-                    }
+                    if (k.length < 6) { errorText = "Geçerli bir anahtar gir."; return@MimirPrimaryButton }
                     loading = true
                     errorText = null
                     successText = null
@@ -130,15 +113,7 @@ fun AddFriendScreen(
                         loading = false
                     }
                 },
-                enabled = !loading,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (loading) CircularProgressIndicator(modifier = Modifier.height(20.dp))
-                else {
-                    Icon(Icons.Default.PersonAdd, contentDescription = null)
-                    Text("  İstek Gönder")
-                }
-            }
+            )
         }
     }
 }

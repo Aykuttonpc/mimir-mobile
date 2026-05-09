@@ -33,7 +33,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import com.aykutcincik.mimir.ui.components.MimirTopBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -109,23 +111,14 @@ fun AdminScreen(
 
     LaunchedEffect(Unit) { reloadPending(); reloadInvitations() }
 
+    Scaffold(topBar = { MimirTopBar(title = "Admin Paneli", onBack = onBack) }) { padScaffold ->
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .padding(padScaffold)
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
     ) {
-        // Header
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
-            }
-            Spacer(Modifier.height(0.dp))
-            Text(
-                text = "Admin Paneli",
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-            )
-        }
         Spacer(Modifier.height(8.dp))
 
         // ── Davet üret ──
@@ -356,6 +349,7 @@ fun AdminScreen(
 
         Spacer(Modifier.height(24.dp))
     }
+    }  // Scaffold close
 }
 
 @Composable

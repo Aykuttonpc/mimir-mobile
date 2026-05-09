@@ -22,18 +22,23 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import com.aykutcincik.mimir.ui.components.BubbleEnter
+import com.aykutcincik.mimir.ui.components.MimirAvatar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -187,21 +192,25 @@ fun ChatScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = {
-                    Column {
-                        Text("@$peerUsername")
-                        val statusLine = when {
-                            peerTyping -> "yazıyor…"
-                            connected -> "● bağlı"
-                            else -> "○ bağlanıyor…"
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        MimirAvatar(username = peerUsername, size = 36.dp)
+                        Spacer(Modifier.size(10.dp))
+                        Column {
+                            Text("@$peerUsername", style = MaterialTheme.typography.titleMedium)
+                            val statusLine = when {
+                                peerTyping -> "yazıyor…"
+                                connected -> "● bağlı"
+                                else -> "○ bağlanıyor…"
+                            }
+                            Text(
+                                text = statusLine,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (connected || peerTyping) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
-                        Text(
-                            text = statusLine,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (connected || peerTyping) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                     }
                 },
                 navigationIcon = {
@@ -209,6 +218,9 @@ fun ChatScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
                     }
                 },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                ),
             )
         },
     ) { padding ->
@@ -251,7 +263,7 @@ fun ChatScreen(
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth().padding(8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 OutlinedTextField(
@@ -262,12 +274,13 @@ fun ChatScreen(
                     modifier = Modifier.weight(1f),
                     enabled = !sending,
                     maxLines = 4,
+                    shape = MaterialTheme.shapes.extraLarge,
                 )
-                Spacer(Modifier.size(8.dp))
-                IconButton(
+                Spacer(Modifier.size(10.dp))
+                FilledIconButton(
                     onClick = {
                         val content = input.trim()
-                        if (content.isBlank() || sending) return@IconButton
+                        if (content.isBlank() || sending) return@FilledIconButton
                         sending = true
                         scope.launch {
                             when (val r = api.sendMessage(peerUserId, content)) {
@@ -289,8 +302,13 @@ fun ChatScreen(
                         }
                     },
                     enabled = !sending && input.isNotBlank(),
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
+                    modifier = Modifier.size(48.dp),
                 ) {
-                    if (sending) CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                    if (sending) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary)
                     else Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Gönder")
                 }
             }

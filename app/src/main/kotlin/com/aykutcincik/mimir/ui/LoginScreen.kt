@@ -1,21 +1,20 @@
 package com.aykutcincik.mimir.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,12 +24,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.aykutcincik.mimir.data.ApiResult
 import com.aykutcincik.mimir.data.AuthResponse
 import com.aykutcincik.mimir.data.LoginRequest
-import com.aykutcincik.mimir.data.MimirApi
+import com.aykutcincik.mimir.ui.components.MimirPrimaryButton
+import com.aykutcincik.mimir.ui.components.MimirTextField
+import com.aykutcincik.mimir.ui.components.MimirTextLink
 import kotlinx.coroutines.launch
 
 @Composable
@@ -47,46 +47,45 @@ fun LoginScreen(
     var loading by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(Unit) { /* ileride: token storage'tan auto-login */ }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 28.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        Spacer(Modifier.height(80.dp))
+
         Text(
             text = "Mimir",
-            style = MaterialTheme.typography.displayMedium.copy(fontWeight = FontWeight.Bold),
+            style = MaterialTheme.typography.displayLarge.copy(fontWeight = FontWeight.Bold),
             color = MaterialTheme.colorScheme.primary,
         )
         Text(
             text = "Bilgelik kuyusunun başı",
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(40.dp))
 
-        OutlinedTextField(
+        Spacer(Modifier.height(56.dp))
+
+        MimirTextField(
             value = usernameOrEmail,
             onValueChange = { usernameOrEmail = it; errorText = null },
-            label = { Text("Kullanıcı adı veya e-posta") },
-            singleLine = true,
+            label = "Kullanıcı adı veya e-posta",
+            keyboardType = KeyboardType.Email,
             enabled = !loading,
-            modifier = Modifier.fillMaxWidth(0.9f),
         )
-        Spacer(Modifier.height(12.dp))
 
-        OutlinedTextField(
+        Spacer(Modifier.height(14.dp))
+
+        MimirTextField(
             value = password,
             onValueChange = { password = it; errorText = null },
-            label = { Text("Şifre") },
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            singleLine = true,
+            label = "Şifre",
+            isPassword = true,
             enabled = !loading,
-            modifier = Modifier.fillMaxWidth(0.9f),
         )
 
         if (errorText != null) {
@@ -98,46 +97,46 @@ fun LoginScreen(
             )
         }
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(28.dp))
 
-        Button(
-            onClick = {
-                if (usernameOrEmail.isBlank() || password.isBlank()) {
-                    errorText = "Tüm alanları doldur."
-                    return@Button
-                }
-                loading = true
-                errorText = null
-                scope.launch {
-                    when (val r = api.login(LoginRequest(usernameOrEmail.trim(), password))) {
-                        is ApiResult.Success -> onLoggedIn(r.value)
-                        is ApiResult.Error -> {
-                            errorText = when (r.errorKey) {
-                                "invalid_credentials" -> "Kullanıcı adı veya şifre hatalı."
-                                "account_not_active" -> { onAccountPending(usernameOrEmail); null }
-                                else -> "Giriş başarısız (HTTP ${r.code}${r.errorKey?.let { " — $it" } ?: ""})."
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            MimirPrimaryButton(
+                text = if (loading) "Giriliyor..." else "Giriş yap",
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !loading,
+                onClick = {
+                    if (usernameOrEmail.isBlank() || password.isBlank()) {
+                        errorText = "Tüm alanları doldur."
+                        return@MimirPrimaryButton
+                    }
+                    loading = true
+                    errorText = null
+                    scope.launch {
+                        when (val r = api.login(LoginRequest(usernameOrEmail.trim(), password))) {
+                            is ApiResult.Success -> onLoggedIn(r.value)
+                            is ApiResult.Error -> {
+                                errorText = when (r.errorKey) {
+                                    "invalid_credentials" -> "Kullanıcı adı veya şifre hatalı."
+                                    "account_not_active" -> { onAccountPending(usernameOrEmail); null }
+                                    else -> "Giriş başarısız (HTTP ${r.code}${r.errorKey?.let { " — $it" } ?: ""})."
+                                }
+                            }
+                            is ApiResult.Failure -> {
+                                errorText = "Bağlantı hatası: ${r.cause.message}"
                             }
                         }
-                        is ApiResult.Failure -> {
-                            errorText = "Bağlantı hatası: ${r.cause.message}"
-                        }
+                        loading = false
                     }
-                    loading = false
-                }
-            },
-            enabled = !loading,
-            modifier = Modifier.fillMaxWidth(0.9f),
-        ) {
+                },
+            )
             if (loading) {
-                CircularProgressIndicator(modifier = Modifier.height(20.dp))
-            } else {
-                Text("Giriş yap")
+                CircularProgressIndicator(modifier = Modifier.size(22.dp))
             }
         }
 
-        Spacer(Modifier.height(12.dp))
-        TextButton(onClick = onGoToRegister, enabled = !loading) {
-            Text("Davet token'ım var, kayıt ol")
-        }
+        Spacer(Modifier.height(16.dp))
+        MimirTextLink(text = "Davet token'ım var, kayıt ol", onClick = onGoToRegister)
+
+        Spacer(Modifier.height(40.dp))
     }
 }

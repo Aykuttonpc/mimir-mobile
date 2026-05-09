@@ -13,20 +13,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.aykutcincik.mimir.ui.components.MimirAvatar
+import com.aykutcincik.mimir.ui.components.MimirTopBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,7 +43,6 @@ import com.aykutcincik.mimir.data.ApiResult
 import com.aykutcincik.mimir.data.FriendRequestDto
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FriendRequestsScreen(
     accessToken: String,
@@ -74,13 +71,9 @@ fun FriendRequestsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Arkadaşlık İstekleri") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
-                    }
-                },
+            MimirTopBar(
+                title = "Arkadaşlık İstekleri",
+                onBack = onBack,
                 actions = {
                     IconButton(onClick = { scope.launch { reload() } }, enabled = !loading) {
                         if (loading) CircularProgressIndicator(modifier = Modifier.size(20.dp))
@@ -139,30 +132,24 @@ private fun RequestRow(
     onReject: () -> Unit,
 ) {
     val incoming = req.direction == "Incoming"
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    Surface(
         modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
+        shadowElevation = 1.dp,
     ) {
         Row(
-            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = req.otherUsername.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-            }
-            Spacer(Modifier.size(12.dp))
+            MimirAvatar(username = req.otherUsername, size = 44.dp)
+            Spacer(Modifier.size(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "@${req.otherUsername}",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     text = if (incoming) "Sana arkadaşlık isteği gönderdi" else "İstek bekliyor (sen gönderdin)",
@@ -171,12 +158,12 @@ private fun RequestRow(
                 )
             }
             if (incoming) {
-                Button(onClick = onAccept, enabled = !isProcessing) {
+                Button(onClick = onAccept, enabled = !isProcessing, shape = MaterialTheme.shapes.medium) {
                     if (isProcessing) CircularProgressIndicator(modifier = Modifier.size(16.dp))
                     else Text("Kabul")
                 }
                 Spacer(Modifier.size(4.dp))
-                OutlinedButton(onClick = onReject, enabled = !isProcessing) { Text("Reddet") }
+                OutlinedButton(onClick = onReject, enabled = !isProcessing, shape = MaterialTheme.shapes.medium) { Text("Reddet") }
             }
         }
     }

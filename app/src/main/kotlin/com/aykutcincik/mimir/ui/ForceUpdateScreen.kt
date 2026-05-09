@@ -13,12 +13,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Upgrade
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import com.aykutcincik.mimir.ui.components.MimirPrimaryButton
+import com.aykutcincik.mimir.ui.components.MimirSecondaryButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -79,7 +79,10 @@ fun ForceUpdateScreen(
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 } else {
-                    Button(
+                    MimirPrimaryButton(
+                        text = "Güncelle",
+                        modifier = Modifier.fillMaxWidth(),
+                        leadingIcon = { Icon(Icons.Default.Download, contentDescription = null); Spacer(Modifier.size(8.dp)) },
                         onClick = {
                             if (!installer.isInstallPermitted()) {
                                 installer.openInstallPermissionSettings()
@@ -89,7 +92,7 @@ fun ForceUpdateScreen(
                                     "İzin verdikten sonra Güncelle'ye tekrar bas",
                                     Toast.LENGTH_LONG
                                 ).show()
-                                return@Button
+                                return@MimirPrimaryButton
                             }
                             phase = UpdatePhase.Downloading
                             scope.launch {
@@ -102,11 +105,7 @@ fun ForceUpdateScreen(
                                 }
                             }
                         },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(Icons.Default.Download, contentDescription = null)
-                        Text("  Güncelle")
-                    }
+                    )
 
                     if (permissionRequested) {
                         Spacer(Modifier.height(8.dp))
@@ -118,13 +117,11 @@ fun ForceUpdateScreen(
                     }
 
                     Spacer(Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick = { installer.openInstallPermissionSettings() },
+                    MimirSecondaryButton(
+                        text = "Kurulum İzinlerini Aç",
                         modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(Icons.Default.Lock, contentDescription = null)
-                        Text("  Kurulum İzinlerini Aç")
-                    }
+                        onClick = { installer.openInstallPermissionSettings() },
+                    )
                 }
             }
             UpdatePhase.Downloading -> {
@@ -149,10 +146,11 @@ fun ForceUpdateScreen(
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = { phase = UpdatePhase.Idle },
+                MimirSecondaryButton(
+                    text = "Tekrar dene",
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Tekrar dene") }
+                    onClick = { phase = UpdatePhase.Idle },
+                )
             }
         }
     }

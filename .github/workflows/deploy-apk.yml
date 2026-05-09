@@ -8,7 +8,7 @@ name: deploy-apk
 
 on:
   push:
-    branches: [kmp-rewrite, main]
+    branches: [master]
     paths:
       - 'app/**'
       - 'data/**'
@@ -55,7 +55,9 @@ jobs:
           echo "📦 versionName: $VERSION"
 
       - name: Build debug APK
-        run: ./gradlew :app:assembleDebug --no-daemon
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :app:assembleDebug --no-daemon
 
       - name: Verify APK
         run: |
@@ -64,11 +66,20 @@ jobs:
           ls -lh "$APK"
 
       - name: Setup SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
         run: |
+          set -e
+          [ -n "$SSH_KEY" ]  || { echo "❌ VPS_SSH_KEY secret boş"; exit 1; }
+          [ -n "$VPS_HOST" ] || { echo "❌ VPS_HOST secret boş"; exit 1; }
+          [ -n "$VPS_USER" ] || { echo "❌ VPS_USER secret boş"; exit 1; }
           mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          echo "$SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+          echo "✅ SSH setup ok (key=$(wc -c < ~/.ssh/deploy_key) bytes, host=$VPS_HOST)"
 
       - name: Upload APK to VPS
         run: |

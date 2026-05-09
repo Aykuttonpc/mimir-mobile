@@ -9,10 +9,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MarkEmailRead
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import com.aykutcincik.mimir.ui.components.MimirPrimaryButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,11 +55,10 @@ fun EmailSentScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(40.dp))
-        Button(
-            onClick = onBackToLogin,
+        MimirPrimaryButton(
+            text = "Giriş ekranına dön",
             modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text("Giriş ekranına dön")
-        }
+            onClick = onBackToLogin,
+        )
     }
 }
