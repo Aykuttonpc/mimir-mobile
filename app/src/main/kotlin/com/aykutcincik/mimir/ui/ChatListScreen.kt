@@ -57,7 +57,7 @@ fun ChatListScreen(
     onNewChat: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val api = remember(accessToken) { MessagingApi(accessToken) }
+    val api = remember(accessToken) { com.aykutcincik.mimir.Apis.messaging(accessToken) }
 
     val items = remember { mutableStateListOf<ConversationDto>() }
     var loading by remember { mutableStateOf(false) }

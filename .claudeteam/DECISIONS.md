@@ -34,6 +34,73 @@
 
 ---
 
+## ADR-016 — Arkadaşlık Modeli: Gizli Key + Karşılıklı Onay (ADR-013'ü geçersiz kılar)
+
+- **Tarih:** 2026-05-09
+- **Durum:** Önerildi (Sprint #6 Tur 2'de implement)
+- **Karar verenler:** PO, AppSec, Tech Lead, Senior Dev #2
+
+**Bağlam:**
+ADR-013'te "tüm Active kullanıcılar birbirine DM atabilir" denmişti — kapalı network argümanıyla. Kullanıcı 2026-05-09'da privacy ihtiyacı netleştirdi: "her kullanıcının kendi gizli key'i, vererek arkadaş ekler". Listede tüm kullanıcılar görünmemeli.
+
+**Karar:**
+ADR-013 supersede. Yeni model:
+- `User.FriendKey` — 12 char URL-safe random, register'da üretilir, regen edilebilir
+- `friendships` tablosu (RequesterId, AddresseeId, Status: Pending/Accepted/Rejected/Blocked)
+- A → B'nin key'ini biliyorsa `POST /friends/requests` (key body'de) → B'ye Pending istek
+- B kabul ederse → Accepted, DM açılır
+- DM gating: `IFriendshipChecker.AreAccepted(a, b)` — MessagesController + DmHub her endpoint'te kontrol
+- `GET /api/users/active` **kaldırılır** (privacy)
+- Migration: mevcut DM çiftlerini Auto-Accepted (alice ↔ aykut korunur)
+
+**Rationale:**
+- Kullanıcı kontrolü: kim DM atabileceğini key paylaşımı ile belirler
+- Spam/abuse riski azalır (sadece tanıdığı key'lerden istek gelir)
+- Privacy: rastgele başkası kullanıcı adımı tahmin edip mesaj atamaz
+
+**Sonuçlar / Trade-off'lar:**
+- (+) Kullanıcı agency: kim ekleyeceğini admin değil kendisi belirler
+- (+) Discovery yüzeyi yok — kim üye olduğu görünmez (sadece arkadaşları)
+- (−) Onboarding sürtünme: yeni kullanıcı önce key sahibinden almalı
+- (−) Mevcut UI gözden geçirme — NewChatScreen kalkıyor, FriendsScreen geliyor
+- ⚠️ Migration'da var olan DM çiftleri otomatik Accepted (veri kaybı yok)
+
+---
+
+## ADR-015 — App Version Gate: Backend Authoritative Force Update
+
+- **Tarih:** 2026-05-09
+- **Durum:** Kabul edildi
+- **Karar verenler:** AppSec, Tech Lead, Senior Dev #1
+
+**Bağlam:**
+T-039 client-side version check (Bootstrap state'inde `/api/app/version`) yumuşak — network fail durumunda bypass, kullanıcı APK'yı eski sürümle çalıştırırsa devam edebilir. Kullanıcı 2026-05-09'da netleştirdi: **eski APK'lar kesinlikle çalışmamalı** (güvenlik patch'leri kritik).
+
+**Değerlendirilen Seçenekler:**
+1. Client-side check güçlendir (offline'da app açılmasın) — UX kötü
+2. Backend middleware: her authenticated request'te `X-App-Version` header check, eski → 426 Upgrade Required
+3. JWT'ye versiyon claim'i göm — token üretirken ekle, every-request kontrol
+
+**Karar:**
+Seçenek 2 — Backend middleware authoritative.
+
+**Implementation:**
+- `AppVersionGateMiddleware`: Path muaf değilse `X-App-Version` header oku
+- `MinAppVersion:{Android|Ios}` config'inden alınan değerle karşılaştır
+- Eksik header veya `< minVersion` → 426 + `{error:"app_version_too_old",minVersion,downloadUrl,platform}`
+- Muaf prefix'ler: `/api/auth/*` (login flow eski APK'ya da açık), `/api/app/version` (gate kontrol kendisi), `/health`, `/hubs/*` (SignalR — REST katmanı korur zaten)
+- Mobile: Ktor client'a default header ekle (`BuildConfig.VERSION_NAME`)
+- Mobile: Bootstrap'ta `/auth/refresh` 426 → ForceUpdateScreen + DataStore.clear()
+
+**Sonuçlar / Trade-off'lar:**
+- (+) Backend authoritative — client tampering veya offline bypass yok
+- (+) Operasyonel kontrol: env değiştir, restart, eski APK'lar anında 426
+- (−) Login endpoint'i muaf (chicken-egg: eski APK login dener, refresh'te 426 alır → ForceUpdate)
+- (−) Eski APK çevrimdışı bile içerik görüntülemez (aslında zaten cache yok, online tasarım)
+- ⚠️ Header yoksa missing-version değerlendirmesi 426 — tüm legacy API client'ları bloklar (Postman/curl manuel test'te `X-App-Version: 99.0.0` ile geçilebilir)
+
+---
+
 ## ADR-014 — Push Notification Provider: APNs + FCM Direct (self-host disiplini)
 
 - **Tarih:** 2026-05-09

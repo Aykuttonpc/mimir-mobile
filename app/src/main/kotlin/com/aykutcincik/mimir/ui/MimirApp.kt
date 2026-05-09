@@ -43,7 +43,7 @@ fun MimirApp() {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val storage = remember { DataStoreTokenStorage(ctx) }
-    val api = remember { MimirApi() }
+    val api = remember { com.aykutcincik.mimir.Apis.mimir() }
 
     var screen: Screen by remember { mutableStateOf<Screen>(Screen.Bootstrap) }
 
@@ -72,7 +72,22 @@ fun MimirApp() {
                 storage.save(r.value, saved.userId)
                 screen = Screen.Home(r.value.username, r.value.isAdmin, r.value.accessToken, saved.userId)
             }
-            is ApiResult.Error, is ApiResult.Failure -> {
+            is ApiResult.Error -> {
+                // ADR-015: backend 426 → eski APK, ForceUpdate; diğer hata → Login
+                if (r.code == 426) {
+                    storage.clear()
+                    val info = (api.appVersion("android") as? ApiResult.Success)?.value
+                    screen = Screen.ForceUpdate(
+                        current = com.aykutcincik.mimir.BuildConfig.VERSION_NAME,
+                        min = info?.minSupportedVersion ?: "0.0.0",
+                        downloadUrl = info?.downloadUrl ?: "",
+                    )
+                } else {
+                    storage.clear()
+                    screen = Screen.Login
+                }
+            }
+            is ApiResult.Failure -> {
                 storage.clear()
                 screen = Screen.Login
             }

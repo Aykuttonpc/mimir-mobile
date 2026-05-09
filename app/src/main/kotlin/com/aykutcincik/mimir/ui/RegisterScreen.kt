@@ -39,7 +39,7 @@ fun RegisterScreen(
     onBackToLogin: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val api = remember { MimirApi() }
+    val api = remember { com.aykutcincik.mimir.Apis.mimir() }
 
     var inviteToken by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }

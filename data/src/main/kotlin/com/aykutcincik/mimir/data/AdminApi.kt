@@ -27,6 +27,8 @@ import kotlinx.serialization.json.Json
 class AdminApi(
     private val accessToken: String,
     baseUrl: String = MimirApi.DEFAULT_BASE_URL,
+    private val appVersion: String = "0.0.0",
+    private val appPlatform: String = "android",
     enableLogging: Boolean = true,
 ) {
     private val json = Json {
@@ -41,6 +43,9 @@ class AdminApi(
             url(baseUrl.trimEnd('/') + "/")
             contentType(ContentType.Application.Json)
             header(HttpHeaders.Authorization, "Bearer $accessToken")
+            // ADR-015 version gate
+            header("X-App-Version", appVersion)
+            header("X-App-Platform", appPlatform)
         }
         install(ContentNegotiation) { json(this@AdminApi.json) }
         if (enableLogging) install(Logging) { level = LogLevel.INFO }

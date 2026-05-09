@@ -67,7 +67,7 @@ fun AdminScreen(
     val ctx = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
-    val api = remember(accessToken) { AdminApi(accessToken) }
+    val api = remember(accessToken) { com.aykutcincik.mimir.Apis.admin(accessToken) }
 
     var note by remember { mutableStateOf("") }
     var expiryDaysText by remember { mutableStateOf("7") }

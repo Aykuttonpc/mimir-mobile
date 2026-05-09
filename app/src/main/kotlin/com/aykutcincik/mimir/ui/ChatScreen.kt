@@ -68,7 +68,7 @@ fun ChatScreen(
     onBack: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val api = remember(accessToken) { MessagingApi(accessToken) }
+    val api = remember(accessToken) { com.aykutcincik.mimir.Apis.messaging(accessToken) }
     val realtime = remember(accessToken) { RealtimeClient(accessToken) }
 
     val messages = remember { mutableStateListOf<MessageDto>() }

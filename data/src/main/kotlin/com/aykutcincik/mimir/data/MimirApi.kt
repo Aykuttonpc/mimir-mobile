@@ -30,6 +30,8 @@ import kotlinx.serialization.json.Json
  */
 class MimirApi(
     baseUrl: String = DEFAULT_BASE_URL,
+    private val appVersion: String = "0.0.0",
+    private val appPlatform: String = "android",
     enableLogging: Boolean = true,
 ) {
     private val json = Json {
@@ -43,6 +45,9 @@ class MimirApi(
         defaultRequest {
             url(baseUrl.trimEnd('/') + "/")
             contentType(ContentType.Application.Json)
+            // T-045 / ADR-015: backend version gate header
+            header("X-App-Version", appVersion)
+            header("X-App-Platform", appPlatform)
         }
         install(ContentNegotiation) { json(this@MimirApi.json) }
         if (enableLogging) install(Logging) { level = LogLevel.INFO }

@@ -40,7 +40,7 @@ fun LoginScreen(
     onGoToRegister: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val api = remember { MimirApi() }
+    val api = remember { com.aykutcincik.mimir.Apis.mimir() }
 
     var usernameOrEmail by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }

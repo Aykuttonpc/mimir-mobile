@@ -41,7 +41,7 @@ fun ChangePasswordScreen(
     onSuccessRequireRelogin: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val api = remember { MimirApi() }
+    val api = remember { com.aykutcincik.mimir.Apis.mimir() }
 
     var currentPwd by remember { mutableStateOf("") }
     var newPwd by remember { mutableStateOf("") }

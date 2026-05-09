@@ -30,6 +30,8 @@ import kotlinx.serialization.json.Json
 class MessagingApi(
     private val accessToken: String,
     baseUrl: String = MimirApi.DEFAULT_BASE_URL,
+    private val appVersion: String = "0.0.0",
+    private val appPlatform: String = "android",
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -43,6 +45,9 @@ class MessagingApi(
             url(baseUrl.trimEnd('/') + "/")
             contentType(ContentType.Application.Json)
             header(HttpHeaders.Authorization, "Bearer $accessToken")
+            // ADR-015 version gate
+            header("X-App-Version", appVersion)
+            header("X-App-Platform", appPlatform)
         }
         install(ContentNegotiation) { json(this@MessagingApi.json) }
     }

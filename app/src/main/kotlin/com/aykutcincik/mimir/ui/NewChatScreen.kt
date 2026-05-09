@@ -57,7 +57,7 @@ fun NewChatScreen(
     onPickUser: (peerId: String, peerUsername: String) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val api = remember(accessToken) { MessagingApi(accessToken) }
+    val api = remember(accessToken) { com.aykutcincik.mimir.Apis.messaging(accessToken) }
 
     var search by remember { mutableStateOf("") }
     val users = remember { mutableStateListOf<ActiveUserDto>() }
