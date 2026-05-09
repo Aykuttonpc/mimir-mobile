@@ -4,7 +4,7 @@
 
 - **Proje adı:** **Mimir** (Norse mit. — bilgelik kuyusunun başı; ADR-009)
 - **Sahibi / paydaş:** Aykut (tek paydaş, admin)
-- **Durum:** **DM uçtan uca canlı** (Sprint #2-#3-#4 close 2026-05-09 — backend + mobile + auth + admin paneli + messaging). Sprint #5 real-time + push + UX.
+- **Durum:** **WhatsApp-class DM production-ready** (Sprint #2-#3-#4-#5 close 2026-05-09 — backend + mobile + auth + admin + real-time messaging + edit/delete/typing + auto-login + force-update). Sprint #6 iOS + push notification.
 - **Aktif branch:** `kmp-rewrite` (mobile, Sprint #3 itibariyle Kotlin+Compose). Backend `mimir-api` master branch.
 - **URL:** `https://aykutonpc.com/mimir/` — Let's Encrypt cert üzerinden public erişim. Mobile-only, path prefix routing (ADR-007). `/mimir/health` canlı.
 - **Repolar:**
@@ -23,7 +23,7 @@ Aykut'un kapalı, kişisel iletişim ağı. Firebase bağımlılığı kaldırı
 ## Başarı Kriterleri
 
 - [ ] Yeni kullanıcı 3-aşama gate'ten geçer (email verify + admin onay) — ADR-010
-- [x] DM çalışıyor (Sprint #4) — gecikme şu an 5sn (polling), Sprint #5'te SignalR ile <1sn'ye iner
+- [x] DM gerçek-zamanlı (Sprint #5 SignalR ile event-driven, gecikme <1sn)
 - [ ] Backend uptime > %99 (mevcut VPS uptime'ı baseline)
 - [ ] Android + iOS native uygulamada ortak codebase (KMP + Compose Multiplatform)
 - [ ] APK direkt distribution + force update mekanizması

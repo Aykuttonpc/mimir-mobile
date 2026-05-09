@@ -5,10 +5,31 @@
 
 ## Aktif Sprint
 
-- **Sprint:** #5 — Real-time + Push + Mesaj UX
-- **Başlangıç:** 2026-05-09 (Sprint #4 kapandı aynı gün)
-- **Hedef bitiş:** [kullanıcı tempo verir]
-- **Sprint hedefi:** Polling'i SignalR'a çevir (real-time DM), push notification altyapısı kur (cihaz kapalıyken bildirim), mesaj edit/soft delete UX'i. Kullanıcı hissi: "WhatsApp-class" anlık + her cihazda tutarlı.
+- **Sprint:** #6 — iOS + Push Notification + KMP Refactor
+- **Başlangıç:** 2026-05-09 (Sprint #5 kapandı aynı gün)
+- **Hedef bitiş:** [macOS erişimi sonrası başlar]
+- **Sprint hedefi:** iOS target aktif et (KMP `:shared` modülüne refactor, RealtimeClient KMP-uyumlu hale gelir), APNs+FCM-direct push notification implementation (ADR-014), kalan Sprint #5 deferred.
+
+## ✅ Sprint #5 KAPANDI (2026-05-09)
+
+**Hedef:** Polling → SignalR real-time, mesaj UX (edit/delete/typing), push provider kararı, force-update + auto-login.
+**Sonuç:** **WhatsApp-class DM canlı** — anlık iletim + typing indicator + edit/delete + okundu badge + auto-login + force-update altyapısı.
+
+| Hedef | Durum |
+|---|---|
+| T-040 Davet listesi + revoke (ekstra fix) | ✅ |
+| T-038 Auto-login (DataStore + refresh) | ✅ |
+| T-039 Force-update min version + ForceUpdateScreen | ✅ |
+| T-036 Push notif provider brief — ADR-014 (APNs+FCM-direct) | ✅ |
+| T-037 SignalR mobile client (polling → events) | ✅ |
+| T-035 Mesaj edit + soft delete (long-press + dialog) | ✅ |
+| T-033 Typing indicator (debounced send + peer status) | ✅ |
+
+### Sprint #5 deferred → Sprint #6
+- T-034 Push notification impl (iOS APNs + Android FCM birlikte, KMP refactor sırasında)
+- T-017 Cert pinning P2 (LE cert kullanılıyor, opsiyonel)
+
+---
 
 ## ✅ Sprint #4 KAPANDI (2026-05-09)
 
@@ -80,18 +101,19 @@
 
 ---
 
-## 📋 Todo (Sprint #5 — Real-time + Push + UX)
+## 📋 Todo (Sprint #6 — iOS + Push + KMP Refactor)
 
 | ID | Başlık | Sahip | Tahmin | Notlar |
 |---|---|---|---|---|
-| T-037 | SignalR mobile client (polling → real-time) | Senior Dev #3 + Innovation Architect | 4-6 saat | `com.microsoft.signalr:signalr:8.0.0` (Java client, Android-only) — KMP'de Sprint #6 öncesi placeholder, Android tarafına entegrasyon. JWT via query `access_token`. Hub reconnect logic. ChatScreen polling'i değiştir (event-driven). |
-| T-036 | Push notification brief + ADR-014 | Tech Radar Engineer + AppSec + Innovation Architect | 1 saat | APNs+FCM-direct (self-host) vs OneSignal (SaaS). Decision matrix: setup karmaşıklığı, iOS uyumu, KVKK 3rd-party data flow, maliyet. ADR yaz. |
-| T-034 | Push notification implementation | Senior Dev #1 + Senior Dev #3 | 6-8 saat | T-036 sonrası seçilen provider'a göre. Backend: yeni mesaj olunca push send. Mobile: device token kayıt endpoint'i + notification handler. iOS Sprint #6'da. |
-| T-035 | Message edit + soft delete | Senior Dev #1 + Senior Dev #3 | 2-3 saat | `PATCH /api/messages/{id}` (edit, sadece sender, EditedAt set), `DELETE /api/messages/{id}` (soft, DeletedAt). Mobile: long-press menü → düzenle/sil. Edit'lenen mesajda "düzenlendi" badge. |
-| T-033 | Typing indicator (DmHub `Typing` invoke + UI) | Senior Dev #3 | 1-2 saat | DmHub'a `Typing(toUserId, isTyping)` zaten var. Mobile ChatScreen'de "..." göster. T-037 sonrası kolay. |
-| T-038 | Auto-login (DataStore'da JWT persist) | Senior Dev #3 | 1 saat | App açılışında DataStore'dan refresh token oku, `/auth/refresh` ile yeni access al, otomatik HomeScreen. Şu an her kapatış login'e dönüyor. |
-| T-039 | Force-update min version check | Senior Dev #1 + Senior Dev #3 | 1 saat | Backend env `MIN_APP_VERSION`. Login response'a ekle. Mobile: response'ta low version → blocking dialog "yeni APK indir". APK güvenlik patch'leri için kritik. |
-| T-017 | Cert pinning (P2 → opsiyonel) | Senior Dev #3 + AppSec | 1 saat | LE cert üzerinde — MITM ek katman. Cert rotation = APK rebuild. Yine P2. |
+| T-041 | iOS toolchain teyit (macOS + Xcode erişimi) | PO + Senior Dev #3 | - | Kullanıcı: Mac mevcut mu, Xcode hazır mı, Apple developer hesabı var mı ($99/yıl). Bu olmadan Sprint #6 başlamaz. |
+| T-042 | KMP refactor: `:data` → `:shared` + iOS target | Senior Dev #3 + Innovation Architect | 1-2 gün | Kotlin Multiplatform plugin + Compose Multiplatform plugin. Ktor engine: OkHttp → multi (OkHttp Android, Darwin iOS). RealtimeClient KMP'ye taşı (Microsoft SignalR Java client iOS'ta yok → SignalR.Client.Kotlin veya manual WebSocket). |
+| T-034a | Backend: device token + FCM push send | Senior Dev #1 + AppSec | 4 saat | Yeni tablo `device_tokens`. POST /api/users/me/device-token. `IPushSender` + `FcmPushSender` (Google service account JWT). Yeni mesaj olunca recipient device tokens → FCM HTTP v1. |
+| T-034b | Backend: APNs push send (iOS) | Senior Dev #1 + AppSec | 4 saat | `ApnsPushSender` (Apple p8 key + JWT). Service factory: platform'a göre seçim. |
+| T-034c | Mobile: FCM SDK + token register + handler | Senior Dev #3 | 3 saat | `com.google.firebase:firebase-messaging` (sadece messaging, BOM değil). google-services.json gerekli — Apple developer + FCM project setup. Token alma + backend kayıt + notification handler. |
+| T-034d | Mobile iOS: APNs entegrasyon (KMP) | Senior Dev #3 | 3 saat | iOS UserNotifications framework. Token register backend'e. Sprint #6 öncesi T-041 zorunlu. |
+| T-043 | Mobile: APK distribution channel | DevOps + Tech Lead | 2 saat | Şu an local APK; T-039'da `APP_DOWNLOAD_URL_ANDROID` boş. Cloud storage (Hetzner Object Storage / S3) public URL veya GitHub Releases. Build → upload → URL set. |
+| T-017 | Cert pinning (P2 → opsiyonel) | Senior Dev #3 + AppSec | 1 saat | LE cert üzerinde MITM ek katman. Cert rotation = APK rebuild. P2. |
+| T-044 | iOS: KMP build + IPA + sideload | Senior Dev #3 + DevOps | 4 saat | Kotlin/Native iOS framework + Xcode SwiftUI/UIKit + Apple developer signed IPA. TestFlight olmadan dev provisioning ile sideload. |
 
 ## 🚧 In Progress
 
@@ -137,7 +159,14 @@
 | T-032 | UsersController active list + arama | 2026-05-09 | EF Functions Like substring search. Limit 1-200. Test: alice listede. |
 | T-030 | ChatListScreen | 2026-05-09 | Conversations LazyColumn + avatar initials + unread badge + FAB + Refresh. Empty state. |
 | T-031 | ChatScreen + polling 5sn | 2026-05-09 | LazyColumn + balon + auto-scroll-to-bottom + auto mark-as-read + send + okundu badge. SignalR client Sprint #5'te. |
-| T-033 partial | Read receipt UI | 2026-05-09 | Auto mark-as-read açıkken peer mesajlarını okur, "okundu" badge sender mesajlarında ReadAt set olunca görünür. Typing T-037 sonrası. |
+| T-033 partial | Read receipt UI | 2026-05-09 | Auto mark-as-read açıkken peer mesajlarını okur, "okundu" badge sender mesajlarında ReadAt set olunca görünür. |
+| T-040 | AdminScreen davet listesi + revoke | 2026-05-09 | GET/DELETE /api/admin/invitations + UI 3. card. Token plain text gösterilmez (hash). Smoke: 3 davet listede görünüyor. |
+| T-038 | Auto-login (DataStore JWT persist + refresh) | 2026-05-09 | App startup Bootstrap → DataStore.load → /auth/refresh → success → HomeScreen direkt. Logout/pwd-change → clear. |
+| T-039 | Force-update min version | 2026-05-09 | Backend GET /api/app/version (config-bazlı). Mobile Bootstrap'ta version check → ForceUpdateScreen blocking. BuildConfig.VERSION_NAME karşılaştırma. |
+| T-036 | Push notif provider brief — ADR-014 | 2026-05-09 | APNs+FCM-direct seçildi (self-host disiplini, ADR-002 uyumu). T-034'te impl Sprint #6'da. |
+| T-037 | SignalR mobile client | 2026-05-09 | com.microsoft.signalr:signalr:8.0.0 + RxJava3 köprü. RealtimeClient (events SharedFlow). ChatScreen polling kaldırıldı, event-driven. Connect status hint top bar. |
+| T-035 | Mesaj edit + soft delete | 2026-05-09 | Backend PATCH/DELETE /api/messages/{id} + DmHub MessageEdited/MessageDeleted broadcast. Mobile long-press → DropdownMenu (Düzenle/Sil) + AlertDialog. "düzenlendi" badge. |
+| T-033 final | Typing indicator | 2026-05-09 | TypingEvent payload type (anonymous → record). RealtimeClient.sendTyping. ChatScreen input change → debounced send (2.5sn pause = false). Peer typing top bar'da "yazıyor…". |
 
 ---
 
@@ -156,8 +185,8 @@
 - **Domain alımı + Let's Encrypt cert** (eski T-012/T-013) — `aykutonpc.com` zaten canlı, mevcut cert kullanılıyor. Sub-domain ihtiyacı doğarsa açılır.
 - **SMS verification + provider** (eski T-010) — ADR-010 ile iptal. Opt-in 2FA (TOTP/WebAuthn) ileride değerlendirilebilir.
 
-## Bloklayıcılar (Sprint #5)
+## Bloklayıcılar (Sprint #6)
 
-- **T-034 (push impl) → T-036 (provider brief)**: Hangi provider seçilmeden impl başlamaz.
-- **T-033 (typing) → T-037 (signalr client)**: Real-time hub kullanılmadan typing pratik değil.
-- iOS toolchain (Sprint #6 öncesi): macOS erişimi hâlâ netleşmemiş — push notification iOS tarafı bunu bekliyor.
+- **T-041 (iOS toolchain teyit) → T-042 + T-044**: macOS + Xcode + Apple developer netleşmeden iOS işi başlamaz.
+- **T-034d (iOS APNs) → T-041 + T-042**: iOS toolchain + KMP refactor önkoşul.
+- **T-043 (APK distribution) → T-039**: Force-update download URL'si gerek; cloud storage + build pipeline kurulumu.

@@ -77,7 +77,8 @@
       "Bash(git -c user.email=\"aykutcincik@ogr.eskisehir.edu.tr\" -c user.name=\"Aykut Cıncık\" commit -m \"T-026: Admin Paneli — davet uret + bekleyen kullanicilar listesi + onay/red\")",
       "Bash(git -c user.email=\"aykutcincik@ogr.eskisehir.edu.tr\" -c user.name=\"Aykut Cıncık\" commit -m \"fix\\(gitignore\\): purge tracked build/ artifacts \\(data/build, app/build\\)\")",
       "Bash(./gradlew :app:compileDebugKotlin --console=plain)",
-      "Bash(./gradlew :data:compileKotlin --console=plain)"
+      "Bash(./gradlew :data:compileKotlin --console=plain)",
+      "Bash(git -c user.email=\"aykutcincik@ogr.eskisehir.edu.tr\" -c user.name=\"Aykut Cıncık\" commit -m \".claudeteam: Sprint #5 close + Sprint #6 plan \\(iOS + KMP refactor + APNs/FCM push\\)\")"
     ]
   }
 }
