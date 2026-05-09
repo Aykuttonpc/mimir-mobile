@@ -84,6 +84,41 @@ data class ApprovalDecisionRequest(
     @SerialName("reason") val reason: String? = null,
 )
 
+// ─────────────────────── Messaging (Sprint #4) ───────
+
+@Serializable
+data class ConversationDto(
+    @SerialName("otherUserId") val otherUserId: String,
+    @SerialName("otherUsername") val otherUsername: String,
+    @SerialName("lastMessageContent") val lastMessageContent: String? = null,
+    @SerialName("lastMessageAt") val lastMessageAt: String? = null,
+    @SerialName("lastMessageFromMe") val lastMessageFromMe: Boolean,
+    @SerialName("unreadCount") val unreadCount: Int,
+)
+
+@Serializable
+data class MessageDto(
+    @SerialName("id") val id: String,
+    @SerialName("senderId") val senderId: String,
+    @SerialName("recipientId") val recipientId: String,
+    @SerialName("content") val content: String,
+    @SerialName("createdAt") val createdAt: String,
+    @SerialName("readAt") val readAt: String? = null,
+    @SerialName("editedAt") val editedAt: String? = null,
+    @SerialName("deletedAt") val deletedAt: String? = null,
+)
+
+@Serializable
+data class ActiveUserDto(
+    @SerialName("id") val id: String,
+    @SerialName("username") val username: String,
+)
+
+@Serializable
+data class SendMessageRequest(
+    @SerialName("content") val content: String,
+)
+
 // ─────────────────────── Errors ─────────────────────
 
 @Serializable
