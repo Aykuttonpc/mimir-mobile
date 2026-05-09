@@ -86,7 +86,8 @@
       "Bash(curl -sSI https://aykutonpc.com/mimir/app/mimir-0.1.0.apk)",
       "Bash(curl -sS -r 0-999 https://aykutonpc.com/mimir/app/mimir-0.1.0.apk -o /tmp/apk-test.bin -w \"HTTP=%{http_code} bytes=%{size_download}\\\\n\")",
       "Read(//tmp/**)",
-      "Bash(./gradlew :app:assembleDebug --rerun-tasks --console=plain)"
+      "Bash(./gradlew :app:assembleDebug --rerun-tasks --console=plain)",
+      "Bash(bash scripts/deploy-apk.sh 0.2.0 --force)"
     ]
   }
 }
