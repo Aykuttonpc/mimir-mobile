@@ -1,6 +1,8 @@
 package com.aykutcincik.mimir.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,10 +17,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -39,14 +46,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import com.aykutcincik.mimir.data.ApiResult
 import com.aykutcincik.mimir.data.MessageDto
 import com.aykutcincik.mimir.data.MessagingApi
 import com.aykutcincik.mimir.realtime.RealtimeClient
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+private const val TYPING_PAUSE_MS = 2500L  // 2.5sn input pause → typing=false
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ChatScreen(
     accessToken: String,
@@ -66,18 +78,25 @@ fun ChatScreen(
     var initialLoading by remember { mutableStateOf(true) }
     var errorText by remember { mutableStateOf<String?>(null) }
     var connected by remember { mutableStateOf(false) }
+    var peerTyping by remember { mutableStateOf(false) }
+    var typingResetJob by remember { mutableStateOf<Job?>(null) }
+    var lastTypingSent by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
-    // İlk yükleme + SignalR connect
+    // Mesaj action menü state
+    var actionFor by remember { mutableStateOf<MessageDto?>(null) }
+    var editingMessage by remember { mutableStateOf<MessageDto?>(null) }
+    var editText by remember { mutableStateOf("") }
+    var deletingMessage by remember { mutableStateOf<MessageDto?>(null) }
+
+    // İlk yükleme + SignalR connect + event collect
     LaunchedEffect(peerUserId) {
-        // 1) Initial REST fetch
         when (val r = api.messagesWith(peerUserId, limit = 50)) {
             is ApiResult.Success -> {
                 messages.clear()
                 seenIds.clear()
                 messages.addAll(r.value)
                 seenIds.addAll(r.value.map { it.id })
-                // Auto mark-as-read peer mesajları için
                 r.value.filter { it.senderId == peerUserId && it.readAt == null }
                     .forEach { api.markAsRead(it.id) }
             }
@@ -86,21 +105,17 @@ fun ChatScreen(
         }
         initialLoading = false
 
-        // 2) SignalR start
         realtime.start()
 
-        // 3) Event collect
         realtime.events.collect { ev ->
             when (ev) {
                 is RealtimeClient.RealtimeEvent.Connected -> connected = true
                 is RealtimeClient.RealtimeEvent.Disconnected -> connected = false
                 is RealtimeClient.RealtimeEvent.Received -> {
                     val m = ev.msg
-                    // Sadece bu peer ile ilgili mesajlar
                     if ((m.senderId == peerUserId || m.recipientId == peerUserId) && m.id !in seenIds) {
                         seenIds.add(m.id)
                         messages.add(m)
-                        // Peer'dan gelen unread → otomatik mark-as-read
                         if (m.senderId == peerUserId && m.readAt == null) {
                             scope.launch { api.markAsRead(m.id) }
                         }
@@ -108,32 +123,66 @@ fun ChatScreen(
                 }
                 is RealtimeClient.RealtimeEvent.Sent -> {
                     val m = ev.msg
-                    // Sender'in başka cihazından gönderim → bu peer ile ilgiliyse listeye ekle
                     if (m.recipientId == peerUserId && m.id !in seenIds) {
                         seenIds.add(m.id)
                         messages.add(m)
                     }
                 }
                 is RealtimeClient.RealtimeEvent.Read -> {
-                    // Bu sohbette ben gönderdiğim mesaj okundu → readAt update
                     val idx = messages.indexOfFirst { it.id == ev.event.messageId }
-                    if (idx >= 0) {
-                        messages[idx] = messages[idx].copy(readAt = ev.event.readAt)
+                    if (idx >= 0) messages[idx] = messages[idx].copy(readAt = ev.event.readAt)
+                }
+                is RealtimeClient.RealtimeEvent.Edited -> {
+                    val idx = messages.indexOfFirst { it.id == ev.event.messageId }
+                    if (idx >= 0) messages[idx] = messages[idx].copy(
+                        content = ev.event.content,
+                        editedAt = ev.event.editedAt,
+                    )
+                }
+                is RealtimeClient.RealtimeEvent.Deleted -> {
+                    val idx = messages.indexOfFirst { it.id == ev.event.messageId }
+                    if (idx >= 0) messages.removeAt(idx)
+                    seenIds.remove(ev.event.messageId)
+                }
+                is RealtimeClient.RealtimeEvent.Typing -> {
+                    if (ev.event.fromUserId == peerUserId) {
+                        peerTyping = ev.event.isTyping
                     }
                 }
-                is RealtimeClient.RealtimeEvent.Error -> {
-                    // Hub fail → user görmez, polling fallback yok şu an. Sprint #5 sonu eklenebilir.
-                }
+                is RealtimeClient.RealtimeEvent.Error -> {}
             }
         }
     }
 
     DisposableEffect(realtime) {
-        onDispose { scope.launch { realtime.stop() } }
+        onDispose {
+            scope.launch {
+                if (lastTypingSent) realtime.sendTyping(peerUserId, false)
+                realtime.stop()
+            }
+        }
     }
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+    }
+
+    // Typing send debounce
+    fun handleInputChange(newValue: String) {
+        input = newValue
+        val nonEmpty = newValue.isNotBlank()
+        if (nonEmpty && !lastTypingSent) {
+            scope.launch { realtime.sendTyping(peerUserId, true) }
+            lastTypingSent = true
+        }
+        typingResetJob?.cancel()
+        typingResetJob = scope.launch {
+            delay(TYPING_PAUSE_MS)
+            if (lastTypingSent) {
+                realtime.sendTyping(peerUserId, false)
+                lastTypingSent = false
+            }
+        }
     }
 
     Scaffold(
@@ -142,10 +191,15 @@ fun ChatScreen(
                 title = {
                     Column {
                         Text("@$peerUsername")
+                        val statusLine = when {
+                            peerTyping -> "yazıyor…"
+                            connected -> "● bağlı"
+                            else -> "○ bağlanıyor…"
+                        }
                         Text(
-                            text = if (connected) "● bağlı" else "○ bağlanıyor…",
+                            text = statusLine,
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (connected) MaterialTheme.colorScheme.primary
+                            color = if (connected || peerTyping) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -176,20 +230,35 @@ fun ChatScreen(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     items(messages, key = { it.id }) { m ->
-                        MessageBubble(m, isMine = m.senderId == currentUserId)
+                        MessageBubble(
+                            m = m,
+                            isMine = m.senderId == currentUserId,
+                            menuOpen = actionFor?.id == m.id,
+                            onLongPress = { if (m.senderId == currentUserId) actionFor = m },
+                            onDismissMenu = { actionFor = null },
+                            onEdit = {
+                                editingMessage = m
+                                editText = m.content
+                                actionFor = null
+                            },
+                            onDelete = {
+                                deletingMessage = m
+                                actionFor = null
+                            },
+                        )
                     }
                 }
             }
 
-            // Input bar
             Row(
                 modifier = Modifier.fillMaxWidth().padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 OutlinedTextField(
                     value = input,
-                    onValueChange = { input = it },
+                    onValueChange = ::handleInputChange,
                     placeholder = { Text("Mesaj yaz…") },
+                    keyboardOptions = KeyboardOptions.Default,
                     modifier = Modifier.weight(1f),
                     enabled = !sending,
                     maxLines = 4,
@@ -203,12 +272,15 @@ fun ChatScreen(
                         scope.launch {
                             when (val r = api.sendMessage(peerUserId, content)) {
                                 is ApiResult.Success -> {
-                                    // Mesajı listeye ekle (SignalR Sent event'i de gelir ama duplicate korur seenIds)
                                     if (r.value.id !in seenIds) {
                                         seenIds.add(r.value.id)
                                         messages.add(r.value)
                                     }
                                     input = ""
+                                    if (lastTypingSent) {
+                                        realtime.sendTyping(peerUserId, false)
+                                        lastTypingSent = false
+                                    }
                                 }
                                 is ApiResult.Error -> errorText = "Gönderilemedi (HTTP ${r.code})"
                                 is ApiResult.Failure -> errorText = "Bağlantı hatası: ${r.cause.message}"
@@ -224,10 +296,93 @@ fun ChatScreen(
             }
         }
     }
+
+    // Edit dialog
+    val editing = editingMessage
+    if (editing != null) {
+        AlertDialog(
+            onDismissRequest = { editingMessage = null },
+            title = { Text("Mesajı düzenle") },
+            text = {
+                OutlinedTextField(
+                    value = editText,
+                    onValueChange = { editText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 6,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val content = editText.trim()
+                        if (content.isBlank() || content == editing.content) {
+                            editingMessage = null; return@TextButton
+                        }
+                        scope.launch {
+                            when (val r = api.editMessage(editing.id, content)) {
+                                is ApiResult.Success -> {
+                                    val idx = messages.indexOfFirst { it.id == editing.id }
+                                    if (idx >= 0) messages[idx] = messages[idx].copy(
+                                        content = content,
+                                        editedAt = java.time.Instant.now().toString(),
+                                    )
+                                    editingMessage = null
+                                }
+                                is ApiResult.Error -> errorText = "Düzenleme başarısız (HTTP ${r.code})"
+                                is ApiResult.Failure -> errorText = "Bağlantı hatası: ${r.cause.message}"
+                            }
+                        }
+                    },
+                ) { Text("Kaydet") }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingMessage = null }) { Text("İptal") }
+            },
+        )
+    }
+
+    // Delete onay
+    val deleting = deletingMessage
+    if (deleting != null) {
+        AlertDialog(
+            onDismissRequest = { deletingMessage = null },
+            title = { Text("Mesajı sil") },
+            text = { Text("Bu mesajı silmek istediğine emin misin? Geri alınamaz.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            when (val r = api.deleteMessage(deleting.id)) {
+                                is ApiResult.Success -> {
+                                    messages.removeAll { it.id == deleting.id }
+                                    seenIds.remove(deleting.id)
+                                    deletingMessage = null
+                                }
+                                is ApiResult.Error -> errorText = "Silme başarısız (HTTP ${r.code})"
+                                is ApiResult.Failure -> errorText = "Bağlantı hatası: ${r.cause.message}"
+                            }
+                        }
+                    },
+                ) { Text("Sil") }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingMessage = null }) { Text("İptal") }
+            },
+        )
+    }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun MessageBubble(m: MessageDto, isMine: Boolean) {
+private fun MessageBubble(
+    m: MessageDto,
+    isMine: Boolean,
+    menuOpen: Boolean,
+    onLongPress: () -> Unit,
+    onDismissMenu: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
     val bg = if (isMine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
     val fg = if (isMine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
     val align = if (isMine) Alignment.End else Alignment.Start
@@ -237,18 +392,39 @@ private fun MessageBubble(m: MessageDto, isMine: Boolean) {
         bottomEnd = if (isMine) 4.dp else 16.dp,
     )
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = align) {
-        Box(
-            modifier = Modifier
-                .widthIn(max = 280.dp)
-                .clip(shape)
-                .background(bg)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-        ) {
-            Text(
-                text = m.content,
-                color = fg,
-                style = MaterialTheme.typography.bodyMedium,
-            )
+        Box {
+            Box(
+                modifier = Modifier
+                    .widthIn(max = 280.dp)
+                    .clip(shape)
+                    .background(bg)
+                    .combinedClickable(
+                        onClick = {},
+                        onLongClick = onLongPress,
+                    )
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Column {
+                    Text(
+                        text = m.content,
+                        color = fg,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    if (m.editedAt != null) {
+                        Text(
+                            text = "düzenlendi",
+                            style = MaterialTheme.typography.labelSmall.copy(fontStyle = FontStyle.Italic),
+                            color = fg.copy(alpha = 0.7f),
+                        )
+                    }
+                }
+            }
+            if (isMine) {
+                DropdownMenu(expanded = menuOpen, onDismissRequest = onDismissMenu) {
+                    DropdownMenuItem(text = { Text("Düzenle") }, onClick = onEdit)
+                    DropdownMenuItem(text = { Text("Sil") }, onClick = onDelete)
+                }
+            }
         }
         if (isMine && m.readAt != null) {
             Text(

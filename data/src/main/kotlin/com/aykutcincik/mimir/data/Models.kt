@@ -140,6 +140,32 @@ data class MessageReadEvent(
     @SerialName("readAt") val readAt: String,
 )
 
+// T-035 — edit / soft delete
+@Serializable
+data class EditMessageRequest(
+    @SerialName("content") val content: String,
+)
+
+@Serializable
+data class MessageEditedEvent(
+    @SerialName("messageId") val messageId: String,
+    @SerialName("content") val content: String,
+    @SerialName("editedAt") val editedAt: String,
+)
+
+@Serializable
+data class MessageDeletedEvent(
+    @SerialName("messageId") val messageId: String,
+    @SerialName("deletedAt") val deletedAt: String,
+)
+
+// T-033 — typing
+@Serializable
+data class TypingEvent(
+    @SerialName("fromUserId") val fromUserId: String,
+    @SerialName("isTyping") val isTyping: Boolean,
+)
+
 // ─────────────────────── App version (T-039) ────────
 
 @Serializable

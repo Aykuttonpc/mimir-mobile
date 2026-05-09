@@ -1,9 +1,12 @@
 package com.aykutcincik.mimir.realtime
 
 import android.util.Log
+import com.aykutcincik.mimir.data.MessageDeletedEvent
 import com.aykutcincik.mimir.data.MessageDto
+import com.aykutcincik.mimir.data.MessageEditedEvent
 import com.aykutcincik.mimir.data.MessageReadEvent
 import com.aykutcincik.mimir.data.MimirApi
+import com.aykutcincik.mimir.data.TypingEvent
 import com.microsoft.signalr.HubConnection
 import com.microsoft.signalr.HubConnectionBuilder
 import com.microsoft.signalr.HubConnectionState
@@ -34,6 +37,9 @@ class RealtimeClient(
         data class Received(val msg: MessageDto) : RealtimeEvent
         data class Sent(val msg: MessageDto) : RealtimeEvent
         data class Read(val event: MessageReadEvent) : RealtimeEvent
+        data class Edited(val event: MessageEditedEvent) : RealtimeEvent
+        data class Deleted(val event: MessageDeletedEvent) : RealtimeEvent
+        data class Typing(val event: TypingEvent) : RealtimeEvent
         data object Connected : RealtimeEvent
         data object Disconnected : RealtimeEvent
         data class Error(val cause: Throwable) : RealtimeEvent
@@ -63,6 +69,18 @@ class RealtimeClient(
             _events.tryEmit(RealtimeEvent.Read(ev))
         }, MessageReadEvent::class.java)
 
+        conn.on("MessageEdited", { ev ->
+            _events.tryEmit(RealtimeEvent.Edited(ev))
+        }, MessageEditedEvent::class.java)
+
+        conn.on("MessageDeleted", { ev ->
+            _events.tryEmit(RealtimeEvent.Deleted(ev))
+        }, MessageDeletedEvent::class.java)
+
+        conn.on("Typing", { ev ->
+            _events.tryEmit(RealtimeEvent.Typing(ev))
+        }, TypingEvent::class.java)
+
         conn.onClosed { e ->
             Log.w(TAG, "Hub closed: ${e?.message}")
             _events.tryEmit(RealtimeEvent.Disconnected)
@@ -84,6 +102,11 @@ class RealtimeClient(
     suspend fun stop() = withContext(Dispatchers.IO) {
         try { hub?.stop()?.blockingAwait() } catch (_: Exception) {}
         hub = null
+    }
+
+    /** Typing indicator gönder (T-033). Hata sessiz yutar — UX'i etkilemesin. */
+    suspend fun sendTyping(toUserId: String, isTyping: Boolean) = withContext(Dispatchers.IO) {
+        try { hub?.send("Typing", toUserId, isTyping) } catch (_: Exception) {}
     }
 
     val isConnected: Boolean

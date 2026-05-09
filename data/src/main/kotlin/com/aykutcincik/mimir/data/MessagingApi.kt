@@ -5,9 +5,11 @@ import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
+import io.ktor.client.request.patch
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
@@ -75,6 +77,28 @@ class MessagingApi(
             ApiResult.Success(Unit)
         else
             ApiResult.Error(resp.status.value)
+    }.getOrElse { ApiResult.Failure(it) }
+
+    suspend fun editMessage(messageId: String, content: String): ApiResult<Unit> = runCatching {
+        val resp: HttpResponse = client.patch("api/messages/$messageId") {
+            setBody(EditMessageRequest(content))
+        }
+        if (resp.status == HttpStatusCode.NoContent || resp.status.value in 200..299)
+            ApiResult.Success(Unit)
+        else {
+            val key = runCatching { resp.body<ApiErrorBody>().error }.getOrNull()
+            ApiResult.Error(resp.status.value, key)
+        }
+    }.getOrElse { ApiResult.Failure(it) }
+
+    suspend fun deleteMessage(messageId: String): ApiResult<Unit> = runCatching {
+        val resp: HttpResponse = client.delete("api/messages/$messageId")
+        if (resp.status == HttpStatusCode.NoContent || resp.status.value in 200..299)
+            ApiResult.Success(Unit)
+        else {
+            val key = runCatching { resp.body<ApiErrorBody>().error }.getOrNull()
+            ApiResult.Error(resp.status.value, key)
+        }
     }.getOrElse { ApiResult.Failure(it) }
 
     suspend fun activeUsers(search: String? = null, limit: Int = 50): ApiResult<List<ActiveUserDto>> = runCatching {
