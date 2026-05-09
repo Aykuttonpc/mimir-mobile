@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.google.services)   // ADR-017: FCM
 }
 
 android {
@@ -12,8 +13,8 @@ android {
         applicationId = "com.aykutcincik.mimir"
         minSdk = 24
         targetSdk = 34
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -81,6 +82,10 @@ dependencies {
 
     // SignalR Java client (T-037 real-time DM) — Android-only şu an, Sprint #6 KMP refactor
     implementation(libs.microsoft.signalr)
+
+    // FCM (ADR-017) — signal-only push, sadece messaging artifact (Auth/Firestore yok)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging.ktx)
 
     testImplementation(libs.junit)
 }

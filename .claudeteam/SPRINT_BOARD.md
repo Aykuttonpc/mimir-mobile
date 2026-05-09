@@ -5,10 +5,41 @@
 
 ## Aktif Sprint
 
-- **Sprint:** #6 — iOS + Push Notification + KMP Refactor
-- **Başlangıç:** 2026-05-09 (Sprint #5 kapandı aynı gün)
-- **Hedef bitiş:** [macOS erişimi sonrası başlar]
-- **Sprint hedefi:** iOS target aktif et (KMP `:shared` modülüne refactor, RealtimeClient KMP-uyumlu hale gelir), APNs+FCM-direct push notification implementation (ADR-014), kalan Sprint #5 deferred.
+- **Sprint:** #7 — Push Notifications (FCM signal-only, ADR-017)
+- **Başlangıç:** 2026-05-09
+- **Hedef bitiş:** Mobile manuel test sonrası kapanış
+- **Sprint hedefi:** Android için FCM signal-only push (ADR-017). iOS APNs Sprint #8'e ertelendi.
+
+### T-051..T-069 — FCM signal-only push (ADR-017)
+
+| Task | Durum | Not |
+|---|---|---|
+| T-051 Backend: FirebaseAdmin NuGet | ✅ | Mimir.Api.csproj |
+| T-052 Backend: UserDeviceToken entity | ✅ | Domain/UserDeviceToken.cs |
+| T-053 Backend: EF migration | ✅ | 20260509173501_AddUserDeviceTokens |
+| T-054 Backend: FcmDispatcher | ✅ | Services/Push/, MulticastMessage + stale token cleanup |
+| T-055 Backend: DevicesController | ✅ | POST/DELETE /api/me/devices |
+| T-056 Backend: MessagesController push tetik | ✅ | Send action sonrası SendNewMessageSignalAsync |
+| T-057 Backend: Program.cs DI + eager init | ✅ | Singleton, startup-time resolve |
+| T-058 Backend: appsettings + Firebase config | ✅ | Firebase:ServiceAccountPath |
+| T-059 Compose: secrets volume mount | ✅ | /opt/mimir/secrets:/app/secrets:ro |
+| T-060 deploy-fcm-key.sh | ✅ | scp + chmod 644 |
+| T-061 Mobile: gradle deps + plugin | ✅ | google-services 4.4.2, firebase-bom 33.7.0 |
+| T-062 AndroidManifest FCM service | ✅ | POST_NOTIFICATIONS permission + service registration |
+| T-063 MimirFcmService | ✅ | onMessageReceived → bildirim, onNewToken → backend |
+| T-064 PushApi (data module) | ✅ | registerDevice / unregisterDevice |
+| T-065 MimirApp token register | ✅ | login/refresh/logout path'lerinde |
+| T-066 Notifications + deep link | ✅ | Channel "mimir_messages" + MainActivity intent |
+| T-067 ADR-017 (supersede ADR-014) | ✅ | DECISIONS.md |
+| T-068 SPRINT_BOARD update | ✅ | bu satır |
+| T-069 versionCode 3 / 0.3.0 bump | ✅ | force update zinciri |
+| Backend deploy | ✅ | mimir-api commit a80b548..93e71ca, VPS rebuild + FCM init verified |
+| Mobile build | ✅ | app-debug.apk 21 MB |
+| **APK deploy + e2e test** | 🔄 | bash scripts/deploy-apk.sh 0.3.0 --force + 2 cihaz arası test |
+
+### Sprint #7 deferred → Sprint #8
+- iOS APNs direct (macOS + Apple developer hesabı + .p8 + JWT)
+- KMP `:data → :shared` refactor
 
 ## ✅ Sprint #5 KAPANDI (2026-05-09)
 

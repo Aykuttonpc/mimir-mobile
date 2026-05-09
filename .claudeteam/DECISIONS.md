@@ -34,6 +34,50 @@
 
 ---
 
+## ADR-017 — FCM Signal-Only Push (ADR-014'ü kısmen geçersiz kılar — Android tarafı)
+
+- **Tarih:** 2026-05-09
+- **Durum:** Kabul edildi (Sprint #7'de implement)
+- **Karar verenler:** PO, AppSec, SecOps, Tech Lead, Senior Dev #1 (.NET), Senior Dev #1 (Android)
+
+**Bağlam:**
+T-034 push notification için ADR-014 "FCM direct" demişti. PO Firebase ekosistemine karşı çıktı ("firebase istemiyom"). 4 alternatif değerlendirildi:
+
+| Seçenek | Sticky? | Ek app? | Real-time? | Self-host? |
+|---|---|---|---|---|
+| WorkManager polling | ❌ | ❌ | ❌ (~15 dk gecikme) | ✅ |
+| ForegroundService persistent WS | ⚠️ (sticky) | ❌ | ✅ | ✅ |
+| Email bildirimi | ❌ | ❌ | ✅ (SMTP gecikme) | ✅ |
+| ntfy self-host + ntfy app | ❌ | ⚠️ (kullanıcı F-Droid'den) | ✅ | ✅ |
+| FCM full ekosistem | ❌ | ❌ (Play Services zaten yüklü) | ✅ | ❌ |
+
+PO ile mimari tartışıldı — anlaşıldı ki "Firebase = Auth + Firestore + Storage + ... + FCM" tüm paket değil, **sadece Cloud Messaging** kullanmak Signal/WhatsApp pattern'i. Mesaj **içeriği** Mimir backend'inde kalır, FCM'e sadece "uyan" sinyali gider.
+
+**Karar:**
+**Android:** FCM **signal-only** — payload `{type:"newMessage", senderUserId}`, içerik yok. Mobile uyandığında Mimir API'sinden mesajı çeker.
+**iOS:** APNs direct (Sprint #8+, Apple developer hesabı + .p8 + JWT — Firebase iOS SDK kullanılmaz).
+
+**Rationale:**
+- Sticky notification yok (PO'nun en kuvvetli kısıtı)
+- Kullanıcı tarafında ek app yok (Play Services stock Android'de zaten var)
+- Real-time (FCM Google Play Services aracılığıyla OS-level uyandırır)
+- Mesaj içeriği Google'a gitmiyor → KVKK kompozisyonu temiz, sızıntı yüzeyi minimal
+- Mimir Auth/DB/Storage hala self-host (sadece push transport Google'da)
+- iOS tarafında APNs direct ile **iki provider** disiplini korunur
+
+**Sonuçlar / Trade-off'lar:**
+- ✅ Mobile: `firebase-messaging` artifact + `google-services.json` — diğer Firebase paketleri yok
+- ✅ Backend: `FirebaseAdmin` SDK 3.0.0 + service account JSON (`/opt/mimir/secrets/`, repo dışı)
+- ✅ Push payload data-only (notification field yok) — Android sistem default bildirim üretmez, biz Notifications.kt ile manuel oluştururuz
+- ⚠️ Google Play Services olmayan cihazlarda (Huawei post-2019, GrapheneOS, vs.) push çalışmaz — Türkiye'de marjinal vaka
+- ⚠️ Google "Mimir için push var" görür (protokol gereği) — içerik göremez ama metadata'sı vardır
+- ⚠️ Service account JSON private key — repo'ya commit edilmemeli (`.gitignore` `secrets/`)
+- 🔄 iOS implementasyonu Sprint #8+ (APNs direct, dotAPNS veya manuel HTTP/2)
+
+**İlgili tasklar:** T-051..T-066
+
+---
+
 ## ADR-016 — Arkadaşlık Modeli: Gizli Key + Karşılıklı Onay (ADR-013'ü geçersiz kılar)
 
 - **Tarih:** 2026-05-09
@@ -104,7 +148,7 @@ Seçenek 2 — Backend middleware authoritative.
 ## ADR-014 — Push Notification Provider: APNs + FCM Direct (self-host disiplini)
 
 - **Tarih:** 2026-05-09
-- **Durum:** Kabul edildi
+- **Durum:** Yerine geçen ADR-017 (Android: FCM signal-only; iOS: APNs hala bekliyor)
 - **Karar verenler:** AppSec, Innovation Architect, ML/RAG Engineer, Tech Lead, PO
 
 **Bağlam:**

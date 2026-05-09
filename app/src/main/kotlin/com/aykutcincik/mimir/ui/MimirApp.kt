@@ -17,6 +17,7 @@ import androidx.compose.runtime.collectAsState
 import com.aykutcincik.mimir.Apis
 import com.aykutcincik.mimir.data.ApiResult
 import com.aykutcincik.mimir.data.DataStoreTokenStorage
+import com.aykutcincik.mimir.push.PushRegistrar
 import com.aykutcincik.mimir.util.VersionGate
 import kotlinx.coroutines.launch
 
@@ -84,6 +85,8 @@ fun MimirApp() {
         when (val r = api.refresh(saved.refreshToken)) {
             is ApiResult.Success -> {
                 storage.save(r.value, saved.userId)
+                // ADR-017: FCM token kaydı (refresh sonrası — eski APK'lar bu noktayı ekler)
+                PushRegistrar.register(r.value.accessToken)
                 screen = Screen.Home(r.value.username, r.value.isAdmin, r.value.accessToken, saved.userId)
             }
             is ApiResult.Error -> {
@@ -121,7 +124,11 @@ fun MimirApp() {
         is Screen.Login -> LoginScreen(
             onLoggedIn = { auth ->
                 val userId = extractSubFromJwt(auth.accessToken) ?: ""
-                scope.launch { storage.save(auth, userId) }
+                scope.launch {
+                    storage.save(auth, userId)
+                    // ADR-017: FCM token kaydı (login sonrası)
+                    PushRegistrar.register(auth.accessToken)
+                }
                 screen = Screen.Home(auth.username, auth.isAdmin, auth.accessToken, userId)
             },
             onAccountPending = { username -> screen = Screen.Pending(username) },
@@ -144,7 +151,10 @@ fun MimirApp() {
             username = s.username,
             isAdmin = s.isAdmin,
             onLogout = {
-                scope.launch { storage.clear() }
+                scope.launch {
+                    PushRegistrar.unregister(s.accessToken)   // ADR-017: token'ı backend'den sil
+                    storage.clear()
+                }
                 screen = Screen.Login
             },
             onOpenAdmin = if (s.isAdmin) {
@@ -164,7 +174,10 @@ fun MimirApp() {
             accessToken = s.accessToken,
             onBack = { screen = Screen.Home(s.username, s.isAdmin, s.accessToken, s.userId) },
             onSuccessRequireRelogin = {
-                scope.launch { storage.clear() }
+                scope.launch {
+                    PushRegistrar.unregister(s.accessToken)
+                    storage.clear()
+                }
                 screen = Screen.Login
             },
         )

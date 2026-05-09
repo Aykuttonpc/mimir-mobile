@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "664048557628",
+    "project_id": "mimir-7521b",
+    "storage_bucket": "mimir-7521b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:664048557628:android:3b2e2f024201676263ed39",
+        "android_client_info": {
+          "package_name": "com.aykutcincik.mimir"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBeMIADRZxRneeyf8l4YMeS3rVHyTvG-x4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

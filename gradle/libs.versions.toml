@@ -19,6 +19,10 @@ kotlinxCoroutines = "1.9.0"
 # Real-time
 signalr = "8.0.0"
 
+# Push (ADR-017 — FCM signal-only)
+firebaseBom = "33.7.0"
+googleServicesPlugin = "4.4.2"
+
 # Test
 junit = "4.13.2"
 
@@ -59,6 +63,10 @@ kotlinx-coroutines-rx3     = { module = "org.jetbrains.kotlinx:kotlinx-coroutine
 # SignalR Java client (T-037)
 microsoft-signalr = { module = "com.microsoft.signalr:signalr", version.ref = "signalr" }
 
+# Firebase (ADR-017) — sadece messaging artifact kullanılır
+firebase-bom            = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+firebase-messaging-ktx  = { module = "com.google.firebase:firebase-messaging-ktx" }
+
 # Test
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
@@ -69,3 +77,4 @@ kotlin-android           = { id = "org.jetbrains.kotlin.android",           vers
 kotlin-jvm               = { id = "org.jetbrains.kotlin.jvm",               version.ref = "kotlin" }
 kotlin-serialization     = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 compose-compiler         = { id = "org.jetbrains.kotlin.plugin.compose",    version.ref = "kotlin" }
+google-services          = { id = "com.google.gms.google-services",         version.ref = "googleServicesPlugin" }

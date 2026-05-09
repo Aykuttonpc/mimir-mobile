@@ -4,6 +4,7 @@ import com.aykutcincik.mimir.data.AdminApi
 import com.aykutcincik.mimir.data.FriendsApi
 import com.aykutcincik.mimir.data.MessagingApi
 import com.aykutcincik.mimir.data.MimirApi
+import com.aykutcincik.mimir.data.PushApi
 import com.aykutcincik.mimir.util.VersionGate
 
 /**
@@ -23,4 +24,5 @@ object Apis {
     fun admin(token: String) = AdminApi(accessToken = token, appVersion = version, appPlatform = PLATFORM, onVersionGate = onGate)
     fun messaging(token: String) = MessagingApi(accessToken = token, appVersion = version, appPlatform = PLATFORM, onVersionGate = onGate)
     fun friends(token: String) = FriendsApi(accessToken = token, appVersion = version, appPlatform = PLATFORM, onVersionGate = onGate)
+    fun push(token: String) = PushApi(accessToken = token, appVersion = version, appPlatform = PLATFORM, onVersionGate = onGate)
 }

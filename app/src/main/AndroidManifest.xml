@@ -7,6 +7,9 @@
     <!-- T-043: in-app APK güncelleme (Play Store yok, sideload). Android 8+ runtime onayı ile. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- ADR-017: FCM bildirimleri için Android 13+ runtime izni -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
@@ -35,5 +38,19 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/provider_paths" />
         </provider>
+
+        <!-- ADR-017: FCM service. onMessageReceived burada handle edilir. -->
+        <service
+            android:name=".push.MimirFcmService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- FCM default notification channel — channel manuel oluşturulduğu için fallback değer -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="mimir_messages" />
     </application>
 </manifest>
