@@ -23,6 +23,9 @@ signalr = "8.0.0"
 firebaseBom = "33.7.0"
 googleServicesPlugin = "4.4.2"
 
+# Splash screen (Android 12+ API, backwards-compat shim)
+androidxSplashscreen = "1.0.1"
+
 # Test
 junit = "4.13.2"
 
@@ -45,6 +48,9 @@ compose-material-icons-extended = { module = "androidx.compose.material:material
 
 # DataStore (token storage)
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "androidxDataStore" }
+
+# Splash screen
+androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "androidxSplashscreen" }
 
 # Ktor (network)
 ktor-client-core           = { module = "io.ktor:ktor-client-core",                 version.ref = "ktor" }

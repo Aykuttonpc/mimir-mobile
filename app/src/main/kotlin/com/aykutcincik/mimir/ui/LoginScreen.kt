@@ -28,6 +28,11 @@ import androidx.compose.ui.unit.dp
 import com.aykutcincik.mimir.data.ApiResult
 import com.aykutcincik.mimir.data.AuthResponse
 import com.aykutcincik.mimir.data.LoginRequest
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import com.aykutcincik.mimir.ui.components.MimirPrimaryButton
 import com.aykutcincik.mimir.ui.components.MimirTextField
 import com.aykutcincik.mimir.ui.components.MimirTextLink
@@ -57,6 +62,30 @@ fun LoginScreen(
     ) {
         Spacer(Modifier.height(80.dp))
 
+        // Brand mark — circular gradient with M
+        Box(
+            modifier = Modifier
+                .size(96.dp)
+                .clip(CircleShape)
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary,
+                            MaterialTheme.colorScheme.tertiary,
+                        )
+                    )
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "M",
+                style = MaterialTheme.typography.displayMedium.copy(fontWeight = FontWeight.Bold),
+                color = androidx.compose.ui.graphics.Color.White,
+            )
+        }
+
+        Spacer(Modifier.height(20.dp))
+
         Text(
             text = "Mimir",
             style = MaterialTheme.typography.displayLarge.copy(fontWeight = FontWeight.Bold),
@@ -68,7 +97,7 @@ fun LoginScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        Spacer(Modifier.height(56.dp))
+        Spacer(Modifier.height(48.dp))
 
         MimirTextField(
             value = usernameOrEmail,

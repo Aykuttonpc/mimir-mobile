@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -44,6 +45,7 @@ import com.aykutcincik.mimir.data.ConversationDto
 import com.aykutcincik.mimir.ui.components.AnimatedListItem
 import com.aykutcincik.mimir.ui.components.MimirAvatar
 import com.aykutcincik.mimir.ui.components.MimirTopBar
+import com.aykutcincik.mimir.ui.components.ShimmerConversationCard
 import com.aykutcincik.mimir.ui.components.rememberMountedState
 import kotlinx.coroutines.launch
 
@@ -105,6 +107,16 @@ fun ChatListScreen(
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(20.dp),
                 )
+            }
+            if (items.isEmpty() && loading) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(6) { ShimmerConversationCard() }
+                }
+                return@Column
             }
             if (items.isEmpty() && !loading && errorText == null) {
                 EmptyState()

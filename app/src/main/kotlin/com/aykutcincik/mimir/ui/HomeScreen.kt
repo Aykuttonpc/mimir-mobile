@@ -42,7 +42,7 @@ import com.aykutcincik.mimir.Apis
 import com.aykutcincik.mimir.data.ApiResult
 import com.aykutcincik.mimir.ui.components.AnimatedListItem
 import com.aykutcincik.mimir.ui.components.MimirAvatar
-import com.aykutcincik.mimir.ui.components.MimirHero
+import com.aykutcincik.mimir.ui.components.MimirHeroGradient
 import com.aykutcincik.mimir.ui.components.MimirSecondaryButton
 import com.aykutcincik.mimir.ui.components.MimirTextLink
 import com.aykutcincik.mimir.ui.components.MimirTopBar
@@ -82,11 +82,11 @@ fun HomeScreen(
         ) {
             Spacer(Modifier.height(8.dp))
 
-            // Hero
-            MimirHero(
+            // Gradient hero with avatar
+            MimirHeroGradient(
                 title = "Hoş geldin",
                 subtitle = "@$username",
-                trailing = { MimirAvatar(username = username, size = 56.dp) },
+                trailing = { MimirAvatar(username = username, size = 56.dp, ring = true) },
             )
 
             Spacer(Modifier.height(28.dp))

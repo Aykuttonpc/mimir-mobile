@@ -117,28 +117,23 @@ fun MeScreen(
 
             Spacer(Modifier.height(4.dp))
 
-            // Profile header
-            Surface(
+            // Gradient profile header
+            com.aykutcincik.mimir.ui.components.MimirGradientPanel(
                 modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraLarge,
-                color = MaterialTheme.colorScheme.primaryContainer,
             ) {
-                Row(
-                    modifier = Modifier.padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    MimirAvatar(username = u.username, size = 72.dp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    MimirAvatar(username = u.username, size = 72.dp, ring = true, online = true)
                     Spacer(Modifier.size(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "@${u.username}",
                             style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            color = androidx.compose.ui.graphics.Color.White,
                         )
                         Text(
                             text = u.email,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.85f),
                         )
                         if (u.isAdmin) {
                             Spacer(Modifier.height(6.dp))

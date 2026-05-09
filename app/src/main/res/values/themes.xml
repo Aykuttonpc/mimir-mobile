@@ -1,7 +1,15 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Compose Material3 zaten runtime theme'i kontrol ediyor; bu sadece app initial splash + system bars için placeholder. -->
+
+    <!-- Splash theme (Android 12+ native API + backport via core-splashscreen) -->
+    <style name="Theme.Mimir.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/mimir_splash_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.Mimir</item>
+    </style>
+
+    <!-- Compose Material3 runtime theme'i kontrol ediyor; bu sadece initial state için. -->
     <style name="Theme.Mimir" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:statusBarColor" tools:targetApi="l">@android:color/transparent</item>
-        <item name="android:windowSplashScreenBackground" tools:targetApi="s">@android:color/black</item>
+        <item name="android:windowSplashScreenBackground" tools:targetApi="s">@color/mimir_splash_bg</item>
     </style>
 </resources>

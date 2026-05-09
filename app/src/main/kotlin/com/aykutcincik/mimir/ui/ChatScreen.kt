@@ -195,7 +195,7 @@ fun ChatScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        MimirAvatar(username = peerUsername, size = 36.dp)
+                        MimirAvatar(username = peerUsername, size = 36.dp, online = connected)
                         Spacer(Modifier.size(10.dp))
                         Column {
                             Text("@$peerUsername", style = MaterialTheme.typography.titleMedium)

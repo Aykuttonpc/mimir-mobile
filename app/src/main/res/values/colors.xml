@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Mimir splash brand color (Norse deep blue) -->
+    <color name="mimir_splash_bg">#0F1F3A</color>
+    <color name="mimir_splash_icon">#FAF7F0</color>
+</resources>
