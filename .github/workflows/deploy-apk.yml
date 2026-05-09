@@ -1,0 +1,136 @@
+name: deploy-apk
+
+# Trigger:
+#   - kmp-rewrite branch'e push → APK build + upload (sadece LATEST güncellenir)
+#   - manual dispatch → opsiyonel "force" input ile MIN_APP_VERSION da bump (eski APK'lar 426)
+#
+# Build artifact debug-signed APK. Production release-signed sürüm Sprint #8'de.
+
+on:
+  push:
+    branches: [kmp-rewrite, main]
+    paths:
+      - 'app/**'
+      - 'data/**'
+      - 'gradle/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - '.github/workflows/deploy-apk.yml'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force update (eski APK 426 alır)'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
+
+concurrency:
+  group: deploy-apk-prod
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Read versionName
+        id: ver
+        run: |
+          VERSION=$(grep -oE 'versionName = "[^"]+"' app/build.gradle.kts | head -1 | sed 's/versionName = "//;s/"$//')
+          if [ -z "$VERSION" ]; then echo "❌ versionName parse fail"; exit 1; fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "📦 versionName: $VERSION"
+
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug --no-daemon
+
+      - name: Verify APK
+        run: |
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          [ -f "$APK" ] || { echo "❌ APK not found: $APK"; exit 1; }
+          ls -lh "$APK"
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Upload APK to VPS
+        run: |
+          VERSION=${{ steps.ver.outputs.version }}
+          REMOTE_APK="/opt/mimir/apks/mimir-${VERSION}.apk"
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "sudo mkdir -p /opt/mimir/apks && sudo chown deploy:deploy /opt/mimir/apks"
+          scp -i ~/.ssh/deploy_key app/build/outputs/apk/debug/app-debug.apk \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:"$REMOTE_APK"
+          echo "📤 Uploaded → $REMOTE_APK"
+
+      - name: Update .env.prod (LATEST + URL, opsiyonel MIN force)
+        run: |
+          VERSION=${{ steps.ver.outputs.version }}
+          FORCE="${{ github.event.inputs.force }}"
+          DOWNLOAD_URL="https://aykutonpc.com/mimir/app/mimir-${VERSION}.apk"
+
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} <<EOF
+            set -e
+            cd /opt/mimir
+            # LATEST + URL her zaman güncellenir
+            sed -i "s|^LATEST_APP_VERSION_ANDROID=.*|LATEST_APP_VERSION_ANDROID=$VERSION|" .env.prod
+            sed -i "s|^APP_DOWNLOAD_URL_ANDROID=.*|APP_DOWNLOAD_URL_ANDROID=$DOWNLOAD_URL|" .env.prod
+
+            if [ "$FORCE" = "true" ]; then
+              echo "🔒 force=true → MIN_APP_VERSION_ANDROID=$VERSION"
+              sed -i "s|^MIN_APP_VERSION_ANDROID=.*|MIN_APP_VERSION_ANDROID=$VERSION|" .env.prod
+            fi
+
+            grep -E "MIN_APP_VERSION_ANDROID|LATEST_APP_VERSION_ANDROID|APP_DOWNLOAD_URL_ANDROID" .env.prod
+
+            # api container restart — yeni env vars'ı oku
+            docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --force-recreate api
+          EOF
+
+      - name: Healthcheck
+        run: |
+          for i in $(seq 1 12); do
+            sleep 5
+            STATUS=$(ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+              "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:9001/health")
+            echo "Attempt $i: /health → $STATUS"
+            [ "$STATUS" = "200" ] && exit 0
+          done
+          echo "❌ Healthcheck timeout"
+          exit 1
+
+      - name: Upload APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mimir-${{ steps.ver.outputs.version }}.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+
+      - name: Summary
+        run: |
+          VERSION=${{ steps.ver.outputs.version }}
+          FORCE="${{ github.event.inputs.force }}"
+          {
+            echo "## ✅ APK Deploy Tamam"
+            echo ""
+            echo "- **versionName:** $VERSION"
+            echo "- **URL:** https://aykutonpc.com/mimir/app/mimir-$VERSION.apk"
+            echo "- **Force update:** $FORCE"
+          } >> "$GITHUB_STEP_SUMMARY"
