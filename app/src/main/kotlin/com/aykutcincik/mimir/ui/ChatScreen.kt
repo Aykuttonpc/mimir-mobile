@@ -84,6 +84,8 @@ fun ChatScreen(
     var errorText by remember { mutableStateOf<String?>(null) }
     var connected by remember { mutableStateOf(false) }
     var peerTyping by remember { mutableStateOf(false) }
+    var peerOnline by remember { mutableStateOf(false) }
+    var peerLastSeen by remember { mutableStateOf<String?>(null) }
     var typingResetJob by remember { mutableStateOf<Job?>(null) }
     var lastTypingSent by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
@@ -96,6 +98,19 @@ fun ChatScreen(
 
     // İlk yükleme + SignalR connect + event collect
     LaunchedEffect(peerUserId) {
+        // Initial peer presence (REST snapshot)
+        scope.launch {
+            val friendsApi = com.aykutcincik.mimir.Apis.friends(accessToken)
+            // Friends list'inde peer presence varsa al
+            val list = friendsApi.listFriends()
+            if (list is com.aykutcincik.mimir.data.ApiResult.Success) {
+                list.value.firstOrNull { it.userId == peerUserId }?.let {
+                    peerOnline = it.isOnline
+                    peerLastSeen = it.lastSeenAt
+                }
+            }
+        }
+
         when (val r = api.messagesWith(peerUserId, limit = 50)) {
             is ApiResult.Success -> {
                 messages.clear()
@@ -154,6 +169,12 @@ fun ChatScreen(
                         peerTyping = ev.event.isTyping
                     }
                 }
+                is RealtimeClient.RealtimeEvent.Presence -> {
+                    if (ev.event.userId == peerUserId) {
+                        peerOnline = ev.event.online
+                        if (ev.event.lastSeenAt != null) peerLastSeen = ev.event.lastSeenAt
+                    }
+                }
                 is RealtimeClient.RealtimeEvent.Error -> {}
             }
         }
@@ -195,19 +216,20 @@ fun ChatScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        MimirAvatar(username = peerUsername, size = 36.dp, online = connected)
+                        MimirAvatar(username = peerUsername, size = 36.dp, online = peerOnline)
                         Spacer(Modifier.size(10.dp))
                         Column {
                             Text("@$peerUsername", style = MaterialTheme.typography.titleMedium)
                             val statusLine = when {
+                                !connected -> "bağlanıyor…"
                                 peerTyping -> "yazıyor…"
-                                connected -> "● bağlı"
-                                else -> "○ bağlanıyor…"
+                                peerOnline -> "çevrimiçi"
+                                else -> "son görülme: ${com.aykutcincik.mimir.util.PresenceFormat.lastSeenLabel(peerLastSeen)}"
                             }
                             Text(
                                 text = statusLine,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = if (connected || peerTyping) MaterialTheme.colorScheme.primary
+                                color = if (peerOnline || peerTyping) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }

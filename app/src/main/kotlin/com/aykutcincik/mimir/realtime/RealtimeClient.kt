@@ -6,6 +6,7 @@ import com.aykutcincik.mimir.data.MessageDto
 import com.aykutcincik.mimir.data.MessageEditedEvent
 import com.aykutcincik.mimir.data.MessageReadEvent
 import com.aykutcincik.mimir.data.MimirApi
+import com.aykutcincik.mimir.data.PresenceChangedEvent
 import com.aykutcincik.mimir.data.TypingEvent
 import com.microsoft.signalr.HubConnection
 import com.microsoft.signalr.HubConnectionBuilder
@@ -40,6 +41,7 @@ class RealtimeClient(
         data class Edited(val event: MessageEditedEvent) : RealtimeEvent
         data class Deleted(val event: MessageDeletedEvent) : RealtimeEvent
         data class Typing(val event: TypingEvent) : RealtimeEvent
+        data class Presence(val event: PresenceChangedEvent) : RealtimeEvent
         data object Connected : RealtimeEvent
         data object Disconnected : RealtimeEvent
         data class Error(val cause: Throwable) : RealtimeEvent
@@ -80,6 +82,10 @@ class RealtimeClient(
         conn.on("Typing", { ev ->
             _events.tryEmit(RealtimeEvent.Typing(ev))
         }, TypingEvent::class.java)
+
+        conn.on("PresenceChanged", { ev ->
+            _events.tryEmit(RealtimeEvent.Presence(ev))
+        }, PresenceChangedEvent::class.java)
 
         conn.onClosed { e ->
             Log.w(TAG, "Hub closed: ${e?.message}")

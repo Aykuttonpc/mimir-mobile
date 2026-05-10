@@ -17,17 +17,22 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -62,6 +67,19 @@ fun ChatListScreen(
     val items = remember { mutableStateListOf<ConversationDto>() }
     var loading by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+    var searchOpen by remember { mutableStateOf(false) }
+
+    val filtered by remember(searchQuery) {
+        derivedStateOf {
+            val q = searchQuery.trim().lowercase()
+            if (q.isBlank()) items.toList()
+            else items.filter {
+                it.otherUsername.lowercase().contains(q) ||
+                (it.lastMessageContent?.lowercase()?.contains(q) == true)
+            }
+        }
+    }
 
     suspend fun reload() {
         loading = true
@@ -79,23 +97,45 @@ fun ChatListScreen(
     Scaffold(
         topBar = {
             MimirTopBar(
-                title = "Mesajlar",
+                title = if (searchOpen) "" else "Mesajlar",
                 actions = {
-                    IconButton(onClick = { scope.launch { reload() } }, enabled = !loading) {
-                        if (loading) CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                        else Icon(Icons.Default.Refresh, contentDescription = "Yenile")
+                    if (searchOpen) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Mesajlarda ara…") },
+                            singleLine = true,
+                            modifier = Modifier
+                                .padding(end = 4.dp)
+                                .size(width = 240.dp, height = 50.dp),
+                            shape = MaterialTheme.shapes.large,
+                            colors = OutlinedTextFieldDefaults.colors(),
+                        )
+                        IconButton(onClick = { searchQuery = ""; searchOpen = false }) {
+                            Icon(Icons.Default.Close, contentDescription = "Kapat")
+                        }
+                    } else {
+                        IconButton(onClick = { searchOpen = true }) {
+                            Icon(Icons.Default.Search, contentDescription = "Ara")
+                        }
+                        IconButton(onClick = { scope.launch { reload() } }, enabled = !loading) {
+                            if (loading) CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                            else Icon(Icons.Default.Refresh, contentDescription = "Yenile")
+                        }
                     }
                 },
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onNewChat,
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("Yeni sohbet") },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            )
+            if (!searchOpen) {
+                ExtendedFloatingActionButton(
+                    onClick = onNewChat,
+                    icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                    text = { Text("Yeni sohbet") },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                )
+            }
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
@@ -120,13 +160,23 @@ fun ChatListScreen(
                 EmptyState()
                 return@Column
             }
+            if (filtered.isEmpty() && searchQuery.isNotBlank()) {
+                Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "\"$searchQuery\" bulunamadı",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                return@Column
+            }
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                itemsIndexed(items, key = { _, it -> it.otherUserId }) { idx, c ->
-                    AnimatedListItem(visible = mounted.value, delayMillis = (idx * 40).coerceAtMost(400)) {
+                itemsIndexed(filtered, key = { _, it -> it.otherUserId }) { idx, c ->
+                    AnimatedListItem(visible = mounted.value, delayMillis = (idx * 30).coerceAtMost(300)) {
                         ConversationCard(
                             c = c,
                             onClick = { onOpenChat(c.otherUserId, c.otherUsername) },

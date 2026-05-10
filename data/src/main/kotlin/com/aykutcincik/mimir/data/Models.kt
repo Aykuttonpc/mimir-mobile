@@ -169,6 +169,16 @@ data class FriendDto(
     @SerialName("userId") val userId: String,
     @SerialName("username") val username: String,
     @SerialName("friendsSince") val friendsSince: String,
+    @SerialName("isOnline") val isOnline: Boolean = false,
+    @SerialName("lastSeenAt") val lastSeenAt: String? = null,
+)
+
+// Sprint #11 — presence
+@Serializable
+data class PresenceChangedEvent(
+    @SerialName("userId") val userId: String,
+    @SerialName("online") val online: Boolean,
+    @SerialName("lastSeenAt") val lastSeenAt: String? = null,
 )
 
 @Serializable
