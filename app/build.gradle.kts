@@ -13,16 +13,32 @@ android {
         applicationId = "com.aykutcincik.mimir"
         minSdk = 24
         targetSdk = 34
-        versionCode = 9
-        versionName = "0.7.0"
+        versionCode = 10
+        versionName = "0.7.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Sabit debug keystore — her build aynı imzayı uretir, APK seamless update
+    // (Android signature mismatch ile "uygulama yuklenemedi" hatasi olmaz).
+    // Debug only — release Play Store'a giderse ayri keystore kullanilir.
+    signingConfigs {
+        create("mimirDebug") {
+            storeFile = file("mimir-debug.keystore")
+            storePassword = "mimirdebug"
+            keyAlias = "mimirdebug"
+            keyPassword = "mimirdebug"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("mimirDebug")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("mimirDebug")   // gecici, release-signed Sprint #15
         }
     }
 
