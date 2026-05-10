@@ -71,6 +71,7 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 kotlinx-coroutines-core    = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core",    version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-rx3     = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-rx3",     version.ref = "kotlinxCoroutines" }
+kotlinx-coroutines-rx2     = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-rx2",     version.ref = "kotlinxCoroutines" }
 
 # SignalR Java client (T-037)
 microsoft-signalr = { module = "com.microsoft.signalr:signalr", version.ref = "signalr" }
