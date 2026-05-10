@@ -181,6 +181,39 @@ data class PresenceChangedEvent(
     @SerialName("lastSeenAt") val lastSeenAt: String? = null,
 )
 
+// Sprint #12 — WebRTC call signaling
+@Serializable
+data class IncomingCallEvent(
+    @SerialName("callerId") val callerId: String,
+    @SerialName("callerUsername") val callerUsername: String,
+    @SerialName("sdpOffer") val sdpOffer: String,
+)
+
+@Serializable
+data class CallAnsweredEvent(
+    @SerialName("answererId") val answererId: String,
+    @SerialName("sdpAnswer") val sdpAnswer: String,
+)
+
+@Serializable
+data class IceCandidateEvent(
+    @SerialName("fromUserId") val fromUserId: String,
+    @SerialName("candidate") val candidate: String,
+)
+
+@Serializable
+data class CallSimpleEvent(
+    @SerialName("fromUserId") val fromUserId: String,
+)
+
+@Serializable
+data class TurnCredentialsDto(
+    @SerialName("urls") val urls: List<String>,
+    @SerialName("username") val username: String,
+    @SerialName("credential") val credential: String,
+    @SerialName("expiresAt") val expiresAt: Long,
+)
+
 @Serializable
 data class SendMessageRequest(
     @SerialName("content") val content: String,

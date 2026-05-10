@@ -15,15 +15,59 @@ object Notifications {
     private const val CHANNEL_NAME = "Mesajlar"
     private const val CHANNEL_DESC = "Yeni DM bildirimleri"
 
+    const val CHANNEL_ID_CALLS = "mimir_calls"
+    private const val CHANNEL_CALLS_NAME = "Sesli Aramalar"
+    private const val CHANNEL_CALLS_DESC = "Gelen sesli arama bildirimleri"
+
     fun ensureChannel(ctx: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = ctx.getSystemService(NotificationManager::class.java) ?: return
-        if (nm.getNotificationChannel(CHANNEL_ID) != null) return
-        nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH).apply {
-                description = CHANNEL_DESC
-            }
+        if (nm.getNotificationChannel(CHANNEL_ID) == null) {
+            nm.createNotificationChannel(
+                NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = CHANNEL_DESC
+                }
+            )
+        }
+        if (nm.getNotificationChannel(CHANNEL_ID_CALLS) == null) {
+            nm.createNotificationChannel(
+                NotificationChannel(CHANNEL_ID_CALLS, CHANNEL_CALLS_NAME, NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = CHANNEL_CALLS_DESC
+                    setSound(
+                        android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_RINGTONE),
+                        android.media.AudioAttributes.Builder()
+                            .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                }
+            )
+        }
+    }
+
+    fun showIncomingCall(ctx: Context, callerUserId: String, callerUsername: String) {
+        ensureChannel(ctx)
+        val openIntent = Intent(ctx, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("incoming_call_from", callerUserId)
+        }
+        val pi = PendingIntent.getActivity(
+            ctx, callerUserId.hashCode() xor 0x42, openIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
+        val notif = NotificationCompat.Builder(ctx, CHANNEL_ID_CALLS)
+            .setSmallIcon(android.R.drawable.sym_call_incoming)
+            .setContentTitle("Mimir gelen arama")
+            .setContentText("@$callerUsername seni arıyor")
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setFullScreenIntent(pi, true)
+            .setContentIntent(pi)
+            .setAutoCancel(true)
+            .build()
+        runCatching {
+            NotificationManagerCompat.from(ctx).notify(callerUserId.hashCode() xor 0x42, notif)
+        }
     }
 
     // ADR-017: 2-aşamalı bildirim. Title = senderUsername (FCM payload'dan, hızlı),

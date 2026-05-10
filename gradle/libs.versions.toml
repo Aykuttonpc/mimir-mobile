@@ -26,6 +26,9 @@ googleServicesPlugin = "4.4.2"
 # Splash screen (Android 12+ API, backwards-compat shim)
 androidxSplashscreen = "1.0.1"
 
+# WebRTC (sesli arama, Sprint #12) — webrtc-sdk fork (resmi Google build mirror)
+webrtc = "114.5735.10"
+
 # Test
 junit = "4.13.2"
 
@@ -51,6 +54,9 @@ androidx-datastore-preferences = { module = "androidx.datastore:datastore-prefer
 
 # Splash screen
 androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "androidxSplashscreen" }
+
+# WebRTC (Sprint #12 voice call — google-webrtc deprecated, fork mirror kullanılır)
+webrtc-android = { module = "io.github.webrtc-sdk:android", version.ref = "webrtc" }
 
 # Ktor (network)
 ktor-client-core           = { module = "io.ktor:ktor-client-core",                 version.ref = "ktor" }

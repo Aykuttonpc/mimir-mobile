@@ -21,6 +21,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
@@ -71,6 +72,7 @@ fun ChatScreen(
     peerUserId: String,
     peerUsername: String,
     onBack: () -> Unit,
+    onStartCall: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     val api = remember(accessToken) { com.aykutcincik.mimir.Apis.messaging(accessToken) }
@@ -176,6 +178,12 @@ fun ChatScreen(
                     }
                 }
                 is RealtimeClient.RealtimeEvent.Error -> {}
+                // Call signaling — CallManager kendi handle ediyor (AuthedScaffold scope)
+                is RealtimeClient.RealtimeEvent.IncomingCall,
+                is RealtimeClient.RealtimeEvent.CallAnswered,
+                is RealtimeClient.RealtimeEvent.IceCandidate,
+                is RealtimeClient.RealtimeEvent.CallRejected,
+                is RealtimeClient.RealtimeEvent.CallEnded -> {}
             }
         }
     }
@@ -238,6 +246,17 @@ fun ChatScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
+                    }
+                },
+                actions = {
+                    if (onStartCall != null) {
+                        IconButton(onClick = onStartCall) {
+                            Icon(
+                                Icons.Filled.Call,
+                                contentDescription = "Sesli ara",
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(

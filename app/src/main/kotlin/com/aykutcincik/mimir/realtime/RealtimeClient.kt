@@ -1,6 +1,10 @@
 package com.aykutcincik.mimir.realtime
 
 import android.util.Log
+import com.aykutcincik.mimir.data.CallAnsweredEvent
+import com.aykutcincik.mimir.data.CallSimpleEvent
+import com.aykutcincik.mimir.data.IceCandidateEvent
+import com.aykutcincik.mimir.data.IncomingCallEvent
 import com.aykutcincik.mimir.data.MessageDeletedEvent
 import com.aykutcincik.mimir.data.MessageDto
 import com.aykutcincik.mimir.data.MessageEditedEvent
@@ -42,6 +46,12 @@ class RealtimeClient(
         data class Deleted(val event: MessageDeletedEvent) : RealtimeEvent
         data class Typing(val event: TypingEvent) : RealtimeEvent
         data class Presence(val event: PresenceChangedEvent) : RealtimeEvent
+        // Sprint #12 voice call signaling
+        data class IncomingCall(val event: IncomingCallEvent) : RealtimeEvent
+        data class CallAnswered(val event: CallAnsweredEvent) : RealtimeEvent
+        data class IceCandidate(val event: IceCandidateEvent) : RealtimeEvent
+        data class CallRejected(val event: CallSimpleEvent) : RealtimeEvent
+        data class CallEnded(val event: CallSimpleEvent) : RealtimeEvent
         data object Connected : RealtimeEvent
         data object Disconnected : RealtimeEvent
         data class Error(val cause: Throwable) : RealtimeEvent
@@ -87,6 +97,27 @@ class RealtimeClient(
             _events.tryEmit(RealtimeEvent.Presence(ev))
         }, PresenceChangedEvent::class.java)
 
+        // Sprint #12 — call signaling events
+        conn.on("IncomingCall", { ev ->
+            _events.tryEmit(RealtimeEvent.IncomingCall(ev))
+        }, IncomingCallEvent::class.java)
+
+        conn.on("CallAnswered", { ev ->
+            _events.tryEmit(RealtimeEvent.CallAnswered(ev))
+        }, CallAnsweredEvent::class.java)
+
+        conn.on("IceCandidate", { ev ->
+            _events.tryEmit(RealtimeEvent.IceCandidate(ev))
+        }, IceCandidateEvent::class.java)
+
+        conn.on("CallRejected", { ev ->
+            _events.tryEmit(RealtimeEvent.CallRejected(ev))
+        }, CallSimpleEvent::class.java)
+
+        conn.on("CallEnded", { ev ->
+            _events.tryEmit(RealtimeEvent.CallEnded(ev))
+        }, CallSimpleEvent::class.java)
+
         conn.onClosed { e ->
             Log.w(TAG, "Hub closed: ${e?.message}")
             _events.tryEmit(RealtimeEvent.Disconnected)
@@ -113,6 +144,23 @@ class RealtimeClient(
     /** Typing indicator gönder (T-033). Hata sessiz yutar — UX'i etkilemesin. */
     suspend fun sendTyping(toUserId: String, isTyping: Boolean) = withContext(Dispatchers.IO) {
         try { hub?.send("Typing", toUserId, isTyping) } catch (_: Exception) {}
+    }
+
+    // Sprint #12 — call signaling
+    suspend fun offerCall(toUserId: String, sdpOffer: String) = withContext(Dispatchers.IO) {
+        hub?.send("OfferCall", toUserId, sdpOffer)
+    }
+    suspend fun answerCall(toUserId: String, sdpAnswer: String) = withContext(Dispatchers.IO) {
+        hub?.send("AnswerCall", toUserId, sdpAnswer)
+    }
+    suspend fun sendIceCandidate(toUserId: String, candidate: String) = withContext(Dispatchers.IO) {
+        try { hub?.send("SendIceCandidate", toUserId, candidate) } catch (_: Exception) {}
+    }
+    suspend fun rejectCall(toUserId: String) = withContext(Dispatchers.IO) {
+        try { hub?.send("RejectCall", toUserId) } catch (_: Exception) {}
+    }
+    suspend fun endCall(toUserId: String) = withContext(Dispatchers.IO) {
+        try { hub?.send("EndCall", toUserId) } catch (_: Exception) {}
     }
 
     val isConnected: Boolean

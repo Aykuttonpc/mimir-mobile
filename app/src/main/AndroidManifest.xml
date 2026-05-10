@@ -10,6 +10,12 @@
     <!-- ADR-017: FCM bildirimleri için Android 13+ runtime izni -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Sprint #12: sesli arama -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />   <!-- bluetooth headset için -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"

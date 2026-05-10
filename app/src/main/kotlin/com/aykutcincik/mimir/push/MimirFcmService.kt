@@ -21,6 +21,18 @@ class MimirFcmService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         val data = message.data
         val type = data["type"] ?: return
+
+        if (type == "callOffer") {
+            // Sprint #12: gelen arama — yüksek öncelikli bildirim, kilit ekranda çal.
+            // SignalR çoğu zaman zaten event'i app'e taşır; FCM sadece app dead durumda
+            // cihazi uyandirir. Notification'a tap'la app açılır, IncomingCall state otomatik
+            // CallScreen'i tetikler.
+            val callerUserId = data["callerUserId"] ?: return
+            val callerUsername = data["callerUsername"] ?: ""
+            Notifications.showIncomingCall(applicationContext, callerUserId, callerUsername)
+            return
+        }
+
         if (type != "newMessage") return
 
         val senderUserId = data["senderUserId"] ?: return

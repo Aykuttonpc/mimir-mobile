@@ -23,9 +23,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.aykutcincik.mimir.Apis
+import com.aykutcincik.mimir.call.CallManager
 import com.aykutcincik.mimir.data.ApiResult
 import com.aykutcincik.mimir.data.DataStoreTokenStorage
 import com.aykutcincik.mimir.push.PushRegistrar
+import com.aykutcincik.mimir.realtime.RealtimeClient
 import com.aykutcincik.mimir.ui.components.MimirBottomBar
 import com.aykutcincik.mimir.ui.components.MimirTab
 import com.aykutcincik.mimir.util.VersionGate
@@ -55,6 +57,7 @@ sealed interface AuthDetail {
     data object AddFriend : AuthDetail
     data object Admin : AuthDetail
     data object ChangePassword : AuthDetail
+    data object Call : AuthDetail   // Sprint #12 — fullscreen call UI (CallManager state'inden render)
 }
 
 @Composable
@@ -186,9 +189,27 @@ private fun AuthedScaffold(
     onLogout: () -> Unit,
     onForceLogout: () -> Unit,
 ) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     val friendsApi = remember(state.accessToken) { Apis.friends(state.accessToken) }
     var pendingCount by remember { mutableIntStateOf(0) }
+
+    // Sprint #12 — uygulama içinde tek RealtimeClient + CallManager (Authed lifecycle).
+    // ChatScreen kendi local RealtimeClient'ini açıyor; bu bağımsız bir uygulama-seviyesi
+    // bağlantı sağlar (incoming call her zaman yakalanır, Chat dışında olsa bile).
+    val appRealtime = remember(state.accessToken) { RealtimeClient(state.accessToken) }
+    LaunchedEffect(state.accessToken) {
+        CallManager.init(ctx)
+        CallManager.bindRealtime(appRealtime)
+        appRealtime.start()
+    }
+    val callState by CallManager.state.collectAsState()
+    LaunchedEffect(callState) {
+        // Incoming call → fullscreen call ekranını aç
+        if (callState is CallManager.CallState.Incoming && state.detail != AuthDetail.Call) {
+            onUpdate(state.copy(detail = AuthDetail.Call))
+        }
+    }
 
     LaunchedEffect(state.accessToken) {
         when (val r = friendsApi.listPendingRequests()) {
@@ -201,13 +222,23 @@ private fun AuthedScaffold(
     val detail = state.detail
     if (detail != null) {
         when (detail) {
-            is AuthDetail.Chat -> ChatScreen(
-                accessToken = state.accessToken,
-                currentUserId = state.userId,
-                peerUserId = detail.peerUserId,
-                peerUsername = detail.peerUsername,
-                onBack = { onUpdate(state.copy(detail = null)) },
-            )
+            is AuthDetail.Chat -> {
+                val ctx2 = androidx.compose.ui.platform.LocalContext.current
+                val scope2 = rememberCoroutineScope()
+                ChatScreen(
+                    accessToken = state.accessToken,
+                    currentUserId = state.userId,
+                    peerUserId = detail.peerUserId,
+                    peerUsername = detail.peerUsername,
+                    onBack = { onUpdate(state.copy(detail = null)) },
+                    onStartCall = {
+                        scope2.launch {
+                            CallManager.startOutgoing(ctx2, detail.peerUserId, detail.peerUsername, state.accessToken)
+                        }
+                        onUpdate(state.copy(detail = AuthDetail.Call))
+                    },
+                )
+            }
             AuthDetail.AddFriend -> AddFriendScreen(
                 accessToken = state.accessToken,
                 onBack = { onUpdate(state.copy(detail = null)) },
@@ -221,6 +252,10 @@ private fun AuthedScaffold(
                 accessToken = state.accessToken,
                 onBack = { onUpdate(state.copy(detail = null)) },
                 onSuccessRequireRelogin = onForceLogout,
+            )
+            AuthDetail.Call -> CallScreen(
+                accessToken = state.accessToken,
+                onClose = { onUpdate(state.copy(detail = null)) },
             )
         }
         return

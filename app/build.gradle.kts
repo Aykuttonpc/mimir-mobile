@@ -13,8 +13,8 @@ android {
         applicationId = "com.aykutcincik.mimir"
         minSdk = 24
         targetSdk = 34
-        versionCode = 8
-        versionName = "0.6.0"
+        versionCode = 9
+        versionName = "0.7.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -89,6 +89,9 @@ dependencies {
     // FCM (ADR-017) — signal-only push, sadece messaging artifact (Auth/Firestore yok)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging.ktx)
+
+    // WebRTC voice call (Sprint #12)
+    implementation(libs.webrtc.android)
 
     testImplementation(libs.junit)
 }

@@ -1,6 +1,7 @@
 package com.aykutcincik.mimir
 
 import com.aykutcincik.mimir.data.AdminApi
+import com.aykutcincik.mimir.data.CallApi
 import com.aykutcincik.mimir.data.FriendsApi
 import com.aykutcincik.mimir.data.MessagingApi
 import com.aykutcincik.mimir.data.MimirApi
@@ -25,4 +26,5 @@ object Apis {
     fun messaging(token: String) = MessagingApi(accessToken = token, appVersion = version, appPlatform = PLATFORM, onVersionGate = onGate)
     fun friends(token: String) = FriendsApi(accessToken = token, appVersion = version, appPlatform = PLATFORM, onVersionGate = onGate)
     fun push(token: String) = PushApi(accessToken = token, appVersion = version, appPlatform = PLATFORM, onVersionGate = onGate)
+    fun call(token: String) = CallApi(accessToken = token, appVersion = version, appPlatform = PLATFORM, onVersionGate = onGate)
 }
