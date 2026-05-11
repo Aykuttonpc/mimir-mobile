@@ -105,24 +105,41 @@ object CallManager {
     }
 
     suspend fun startOutgoing(ctx: Context, peerId: String, peerUsername: String, accessToken: String) {
-        init(ctx)
-        ensureIceServers(accessToken)
+        try {
+            Log.i(TAG, "startOutgoing[1]: init")
+            init(ctx)
 
-        _state.value = CallState.Outgoing(peerId, peerUsername)
+            Log.i(TAG, "startOutgoing[2]: ensureIceServers")
+            ensureIceServers(accessToken)
 
-        val pc = createPeerConnection(peerId) ?: run { end("PC oluşturulamadı"); return }
-        peerConnection = pc
+            _state.value = CallState.Outgoing(peerId, peerUsername)
 
-        addLocalAudio(pc)
+            Log.i(TAG, "startOutgoing[3]: createPeerConnection (ice=${iceServers.size})")
+            val pc = createPeerConnection(peerId) ?: run { end("PC olusturulamadi"); return }
+            peerConnection = pc
 
-        val constraints = MediaConstraints().apply {
-            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
+            Log.i(TAG, "startOutgoing[4]: addLocalAudio")
+            addLocalAudio(pc)
+
+            Log.i(TAG, "startOutgoing[5]: createOffer")
+            val constraints = MediaConstraints().apply {
+                mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
+            }
+            val offer = createOffer(pc, constraints)
+            if (offer == null) { end("Offer olusturulamadi"); return }
+
+            Log.i(TAG, "startOutgoing[6]: setLocalSdp (sdpLen=${offer.description.length})")
+            setLocalSdp(pc, offer)
+
+            Log.i(TAG, "startOutgoing[7]: realtime.offerCall (rt=${realtime != null})")
+            val rt = realtime
+            if (rt == null) { end("realtime baglantisi yok"); return }
+            rt.offerCall(peerId, offer.description)
+            Log.i(TAG, "startOutgoing[8]: OfferCall SENT")
+        } catch (e: Exception) {
+            Log.e(TAG, "startOutgoing FAIL: ${e.message}", e)
+            end("Hata: ${e.message?.take(60) ?: e.javaClass.simpleName}")
         }
-        val offer = createOffer(pc, constraints)
-        if (offer == null) { end("Offer oluşturulamadı"); return }
-
-        setLocalSdp(pc, offer)
-        realtime?.offerCall(peerId, offer.description)
     }
 
     /** UI'dan kabul tıklanınca — Incoming → Connecting + answer SDP gönder */
