@@ -104,74 +104,82 @@ object CallManager {
         }
     }
 
-    suspend fun startOutgoing(ctx: Context, peerId: String, peerUsername: String, accessToken: String) {
-        try {
-            Log.i(TAG, "startOutgoing[1]: init")
-            init(ctx)
+    /**
+     * Fire-and-forget — CallManager'ın kendi SupervisorScope'unda çalışır.
+     * Eski versiyon `suspend` idi → caller (Compose UI) `scope2.launch { startOutgoing(...) }`
+     * ile çağırıyordu; ama hemen ardından `onUpdate(detail = Call)` Chat composable'ı
+     * dispose ediyordu → scope2 cancel → startOutgoing CancellationException ile yarıda
+     * kesiliyordu. "Aranıyor…" görünüyor ama OfferCall hiç gönderilmiyordu.
+     */
+    fun startOutgoing(ctx: Context, peerId: String, peerUsername: String, accessToken: String) {
+        scope.launch {
+            try {
+                init(ctx)
+                ensureIceServers(accessToken)
+                _state.value = CallState.Outgoing(peerId, peerUsername)
 
-            Log.i(TAG, "startOutgoing[2]: ensureIceServers")
-            ensureIceServers(accessToken)
+                val pc = createPeerConnection(peerId) ?: run { end("PC olusturulamadi"); return@launch }
+                peerConnection = pc
 
-            _state.value = CallState.Outgoing(peerId, peerUsername)
+                addLocalAudio(pc)
 
-            Log.i(TAG, "startOutgoing[3]: createPeerConnection (ice=${iceServers.size})")
-            val pc = createPeerConnection(peerId) ?: run { end("PC olusturulamadi"); return }
-            peerConnection = pc
+                val constraints = MediaConstraints().apply {
+                    mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
+                }
+                val offer = createOffer(pc, constraints)
+                if (offer == null) { end("Offer olusturulamadi"); return@launch }
 
-            Log.i(TAG, "startOutgoing[4]: addLocalAudio")
-            addLocalAudio(pc)
+                setLocalSdp(pc, offer)
 
-            Log.i(TAG, "startOutgoing[5]: createOffer")
-            val constraints = MediaConstraints().apply {
-                mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
+                val rt = realtime ?: run { end("realtime baglantisi yok"); return@launch }
+                rt.offerCall(peerId, offer.description)
+            } catch (e: Exception) {
+                Log.e(TAG, "startOutgoing FAIL: ${e.message}")
+                end("Hata: ${e.message?.take(60) ?: e.javaClass.simpleName}")
             }
-            val offer = createOffer(pc, constraints)
-            if (offer == null) { end("Offer olusturulamadi"); return }
-
-            Log.i(TAG, "startOutgoing[6]: setLocalSdp (sdpLen=${offer.description.length})")
-            setLocalSdp(pc, offer)
-
-            Log.i(TAG, "startOutgoing[7]: realtime.offerCall (rt=${realtime != null})")
-            val rt = realtime
-            if (rt == null) { end("realtime baglantisi yok"); return }
-            rt.offerCall(peerId, offer.description)
-            Log.i(TAG, "startOutgoing[8]: OfferCall SENT")
-        } catch (e: Exception) {
-            Log.e(TAG, "startOutgoing FAIL: ${e.message}", e)
-            end("Hata: ${e.message?.take(60) ?: e.javaClass.simpleName}")
         }
     }
 
-    /** UI'dan kabul tıklanınca — Incoming → Connecting + answer SDP gönder */
-    suspend fun acceptIncoming(ctx: Context, accessToken: String) {
+    /** UI'dan kabul tıklanınca — fire-and-forget, kendi scope'umuzda. */
+    fun acceptIncoming(ctx: Context, accessToken: String) {
         val incoming = _state.value as? CallState.Incoming ?: return
-        init(ctx)
-        ensureIceServers(accessToken)
+        scope.launch {
+            try {
+                init(ctx)
+                ensureIceServers(accessToken)
+                _state.value = CallState.Connecting(incoming.peerId, incoming.peerUsername)
 
-        _state.value = CallState.Connecting(incoming.peerId, incoming.peerUsername)
+                val pc = createPeerConnection(incoming.peerId) ?: run { end("PC olusturulamadi"); return@launch }
+                peerConnection = pc
 
-        val pc = createPeerConnection(incoming.peerId) ?: run { end("PC oluşturulamadı"); return }
-        peerConnection = pc
+                addLocalAudio(pc)
+                setRemoteSdp(pc, SessionDescription(SessionDescription.Type.OFFER, incoming.sdpOffer))
 
-        addLocalAudio(pc)
-        setRemoteSdp(pc, SessionDescription(SessionDescription.Type.OFFER, incoming.sdpOffer))
-
-        val answer = createAnswer(pc, MediaConstraints())
-        if (answer == null) { end("Answer oluşturulamadı"); return }
-        setLocalSdp(pc, answer)
-        realtime?.answerCall(incoming.peerId, answer.description)
+                val answer = createAnswer(pc, MediaConstraints())
+                if (answer == null) { end("Answer olusturulamadi"); return@launch }
+                setLocalSdp(pc, answer)
+                realtime?.answerCall(incoming.peerId, answer.description)
+            } catch (e: Exception) {
+                Log.e(TAG, "acceptIncoming FAIL: ${e.message}")
+                end("Hata: ${e.message?.take(60) ?: e.javaClass.simpleName}")
+            }
+        }
     }
 
-    suspend fun rejectIncoming() {
+    fun rejectIncoming() {
         val incoming = _state.value as? CallState.Incoming ?: return
-        realtime?.rejectCall(incoming.peerId)
-        end("Reddedildi")
+        scope.launch {
+            try { realtime?.rejectCall(incoming.peerId) } catch (_: Exception) {}
+            end("Reddedildi")
+        }
     }
 
-    suspend fun hangup() {
+    fun hangup() {
         val peerId = currentPeerId() ?: return end("Bitti")
-        realtime?.endCall(peerId)
-        end("Bitti")
+        scope.launch {
+            try { realtime?.endCall(peerId) } catch (_: Exception) {}
+            end("Bitti")
+        }
     }
 
     fun end(reason: String) {

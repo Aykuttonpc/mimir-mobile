@@ -141,33 +141,22 @@ class RealtimeClient(
         hub = null
     }
 
-    /**
-     * Typing indicator gönder (T-033).
-     * Java SignalR `send()` Completable döner — subscribe edilmesi şart, yoksa
-     * lazy ve hiç tetiklenmez. `invoke()` farklı: Single döner, `.blockingGet()` ile
-     * sonuç beklenir + exception throw eder. Send/invoke aynı işi yapar pratikte.
-     */
+    // SignalR Java client'ında `send()` Completable döner — subscribe edilmesi şart,
+    // yoksa lazy ve hiç tetiklenmez. `invoke(Void::class.java, ...)` Single döner;
+    // `.blockingGet()` await + exception throw (HubException backend tarafından
+    // fırlatılırsa mobile'da yakalanır).
     suspend fun sendTyping(toUserId: String, isTyping: Boolean) = withContext(Dispatchers.IO) {
         try { hub?.invoke(Void::class.java, "Typing", toUserId, isTyping)?.blockingGet() } catch (_: Exception) {}
     }
 
-    // Sprint #12 — call signaling. invoke().blockingGet() ile send tetiklenir +
-    // backend exception (HubException) mobile'a fırlatılır → log'da görürüz.
+    // Sprint #12 — call signaling
     suspend fun offerCall(toUserId: String, sdpOffer: String) = withContext(Dispatchers.IO) {
-        try {
-            hub?.invoke(Void::class.java, "OfferCall", toUserId, sdpOffer)?.blockingGet()
-            Log.i(TAG, "offerCall sent → $toUserId (sdpLen=${sdpOffer.length})")
-        } catch (e: Exception) {
-            Log.e(TAG, "offerCall fail: ${e.message}", e)
-        }
+        try { hub?.invoke(Void::class.java, "OfferCall", toUserId, sdpOffer)?.blockingGet() }
+        catch (e: Exception) { Log.e(TAG, "offerCall fail: ${e.message}") }
     }
     suspend fun answerCall(toUserId: String, sdpAnswer: String) = withContext(Dispatchers.IO) {
-        try {
-            hub?.invoke(Void::class.java, "AnswerCall", toUserId, sdpAnswer)?.blockingGet()
-            Log.i(TAG, "answerCall sent → $toUserId (sdpLen=${sdpAnswer.length})")
-        } catch (e: Exception) {
-            Log.e(TAG, "answerCall fail: ${e.message}", e)
-        }
+        try { hub?.invoke(Void::class.java, "AnswerCall", toUserId, sdpAnswer)?.blockingGet() }
+        catch (e: Exception) { Log.e(TAG, "answerCall fail: ${e.message}") }
     }
     suspend fun sendIceCandidate(toUserId: String, candidate: String) = withContext(Dispatchers.IO) {
         try { hub?.invoke(Void::class.java, "SendIceCandidate", toUserId, candidate)?.blockingGet() } catch (_: Exception) {}

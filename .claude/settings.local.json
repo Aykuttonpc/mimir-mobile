@@ -87,7 +87,18 @@
       "Bash(curl -sS -r 0-999 https://aykutonpc.com/mimir/app/mimir-0.1.0.apk -o /tmp/apk-test.bin -w \"HTTP=%{http_code} bytes=%{size_download}\\\\n\")",
       "Read(//tmp/**)",
       "Bash(./gradlew :app:assembleDebug --rerun-tasks --console=plain)",
-      "Bash(bash scripts/deploy-apk.sh 0.2.0 --force)"
+      "Bash(bash scripts/deploy-apk.sh 0.2.0 --force)",
+      "Bash(git branch *)",
+      "Bash(git stash *)",
+      "Bash(/d/Projeler/InstaClone/gradlew -p /d/Projeler/InstaClone :app:assembleDebug)",
+      "Bash(git reset *)",
+      "Bash(git commit -m ' *)",
+      "Bash(dotnet ef *)",
+      "Bash(curl -s -X POST https://aykutonpc.com/mimir/api/auth/login -H 'Content-Type: application/json' -H 'X-App-Version: 0.7.0' -H 'X-App-Platform: android' -d '{\"usernameOrEmail\":\"test1\",\"password\":\"testuser1\"}')",
+      "Bash(ssh -i ~/.ssh/hetzner_aopc deploy@178.104.198.249 \"ss -ulnp 2>/dev/null | grep -E ':3478|:5349' | head -5\")",
+      "Bash('/c/Program Files/Android/Android Studio/jbr/bin/keytool.exe' -genkeypair -v -keystore app/mimir-debug.keystore -storepass mimirdebug -keypass mimirdebug -alias mimirdebug -keyalg RSA -keysize 2048 -validity 10000 -dname 'CN=Mimir Debug,OU=Dev,O=AykutOnPC,L=Eskisehir,C=TR')",
+      "Bash(./gradlew :app:assembleDebug)",
+      "Bash(./gradlew :app:compileDebugKotlin)"
     ]
   }
 }

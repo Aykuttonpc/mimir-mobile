@@ -224,7 +224,6 @@ private fun AuthedScaffold(
         when (detail) {
             is AuthDetail.Chat -> {
                 val ctx2 = androidx.compose.ui.platform.LocalContext.current
-                val scope2 = rememberCoroutineScope()
                 ChatScreen(
                     accessToken = state.accessToken,
                     currentUserId = state.userId,
@@ -232,9 +231,8 @@ private fun AuthedScaffold(
                     peerUsername = detail.peerUsername,
                     onBack = { onUpdate(state.copy(detail = null)) },
                     onStartCall = {
-                        scope2.launch {
-                            CallManager.startOutgoing(ctx2, detail.peerUserId, detail.peerUsername, state.accessToken)
-                        }
+                        // CallManager kendi SupervisorScope'unda çalışır — UI lifecycle bağımsız.
+                        CallManager.startOutgoing(ctx2, detail.peerUserId, detail.peerUsername, state.accessToken)
                         onUpdate(state.copy(detail = AuthDetail.Call))
                     },
                 )

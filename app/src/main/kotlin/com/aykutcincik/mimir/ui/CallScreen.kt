@@ -89,7 +89,7 @@ fun CallScreen(accessToken: String, onClose: () -> Unit) {
                 pulsing = true,
                 accessToken = accessToken,
                 showAccept = false,
-                onHangup = { scope.launch { CallManager.hangup() } },
+                onHangup = { CallManager.hangup() },
             )
             is CallManager.CallState.Incoming -> CallContent(
                 title = "@${s.peerUsername}",
@@ -98,8 +98,8 @@ fun CallScreen(accessToken: String, onClose: () -> Unit) {
                 pulsing = true,
                 accessToken = accessToken,
                 showAccept = true,
-                onAccept = { scope.launch { CallManager.acceptIncoming(ctx, accessToken) } },
-                onHangup = { scope.launch { CallManager.rejectIncoming() } },
+                onAccept = { CallManager.acceptIncoming(ctx, accessToken) },
+                onHangup = { CallManager.rejectIncoming() },
             )
             is CallManager.CallState.Connecting -> CallContent(
                 title = "@${s.peerUsername}",
@@ -108,7 +108,7 @@ fun CallScreen(accessToken: String, onClose: () -> Unit) {
                 pulsing = true,
                 accessToken = accessToken,
                 showAccept = false,
-                onHangup = { scope.launch { CallManager.hangup() } },
+                onHangup = { CallManager.hangup() },
             )
             is CallManager.CallState.Connected -> {
                 var elapsedMs by remember { mutableLongStateOf(0L) }
@@ -128,7 +128,7 @@ fun CallScreen(accessToken: String, onClose: () -> Unit) {
                     accessToken = accessToken,
                     showAccept = false,
                     showInCallActions = true,
-                    onHangup = { scope.launch { CallManager.hangup() } },
+                    onHangup = { CallManager.hangup() },
                 )
             }
             is CallManager.CallState.Ended -> CallContent(
