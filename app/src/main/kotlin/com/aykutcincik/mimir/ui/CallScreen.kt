@@ -63,9 +63,18 @@ fun CallScreen(accessToken: String, onClose: () -> Unit) {
     val scope = rememberCoroutineScope()
     val state by CallManager.state.collectAsState()
 
-    // Idle / Ended → ekrandan çık
+    // Idle veya Ended → ekrandan çık (Ended 2sn sonra otomatik Idle'a düşer ama biz beklemeyelim)
     LaunchedEffect(state) {
         if (state is CallManager.CallState.Idle) onClose()
+    }
+    // Sistem back tuşu — Ended state'inde takılmasın
+    androidx.activity.compose.BackHandler(enabled = state !is CallManager.CallState.Connected) {
+        when (state) {
+            is CallManager.CallState.Idle, is CallManager.CallState.Ended -> onClose()
+            is CallManager.CallState.Outgoing, is CallManager.CallState.Connecting -> CallManager.hangup()
+            is CallManager.CallState.Incoming -> CallManager.rejectIncoming()
+            else -> {}
+        }
     }
 
     val gradient = Brush.verticalGradient(

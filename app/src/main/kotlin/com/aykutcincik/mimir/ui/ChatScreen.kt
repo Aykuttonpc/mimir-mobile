@@ -71,12 +71,12 @@ fun ChatScreen(
     currentUserId: String,
     peerUserId: String,
     peerUsername: String,
+    realtime: RealtimeClient,        // AuthedScaffold'tan paylaşılan tek instance
     onBack: () -> Unit,
     onStartCall: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     val api = remember(accessToken) { com.aykutcincik.mimir.Apis.messaging(accessToken) }
-    val realtime = remember(accessToken) { RealtimeClient(accessToken) }
 
     val messages = remember { mutableStateListOf<MessageDto>() }
     val seenIds = remember { mutableSetOf<String>() }
@@ -127,7 +127,8 @@ fun ChatScreen(
         }
         initialLoading = false
 
-        realtime.start()
+        // AppRealtime AuthedScaffold tarafından zaten start edildi — sadece event'leri dinle.
+        connected = realtime.isConnected
 
         realtime.events.collect { ev ->
             when (ev) {
@@ -190,9 +191,9 @@ fun ChatScreen(
 
     DisposableEffect(realtime) {
         onDispose {
+            // Connection AuthedScaffold sahibi — biz sadece "yazıyor" durumunu temizle.
             scope.launch {
                 if (lastTypingSent) realtime.sendTyping(peerUserId, false)
-                realtime.stop()
             }
         }
     }

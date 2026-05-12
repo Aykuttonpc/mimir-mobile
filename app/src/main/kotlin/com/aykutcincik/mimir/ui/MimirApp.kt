@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -194,14 +195,19 @@ private fun AuthedScaffold(
     val friendsApi = remember(state.accessToken) { Apis.friends(state.accessToken) }
     var pendingCount by remember { mutableIntStateOf(0) }
 
-    // Sprint #12 — uygulama içinde tek RealtimeClient + CallManager (Authed lifecycle).
-    // ChatScreen kendi local RealtimeClient'ini açıyor; bu bağımsız bir uygulama-seviyesi
-    // bağlantı sağlar (incoming call her zaman yakalanır, Chat dışında olsa bile).
-    val appRealtime = remember(state.accessToken) { RealtimeClient(state.accessToken) }
+    // TEK RealtimeClient — Authed lifecycle. ChatScreen bunu paylaşır (kendisi başka
+    // connection açmaz). CallManager da bunu kullanır.
+    val realtime = remember(state.accessToken) { RealtimeClient(state.accessToken) }
     LaunchedEffect(state.accessToken) {
         CallManager.init(ctx)
-        CallManager.bindRealtime(appRealtime)
-        appRealtime.start()
+        CallManager.bindRealtime(realtime, state.userId)
+        realtime.start()
+    }
+    DisposableEffect(state.accessToken) {
+        onDispose {
+            // Authed scope kapanırsa (logout/force-update) connection'ı temizle
+            scope.launch { realtime.stop() }
+        }
     }
     val callState by CallManager.state.collectAsState()
     LaunchedEffect(callState) {
@@ -229,9 +235,9 @@ private fun AuthedScaffold(
                     currentUserId = state.userId,
                     peerUserId = detail.peerUserId,
                     peerUsername = detail.peerUsername,
+                    realtime = realtime,                     // shared connection
                     onBack = { onUpdate(state.copy(detail = null)) },
                     onStartCall = {
-                        // CallManager kendi SupervisorScope'unda çalışır — UI lifecycle bağımsız.
                         CallManager.startOutgoing(ctx2, detail.peerUserId, detail.peerUsername, state.accessToken)
                         onUpdate(state.copy(detail = AuthDetail.Call))
                     },

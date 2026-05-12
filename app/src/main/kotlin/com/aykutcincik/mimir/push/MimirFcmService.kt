@@ -23,13 +23,17 @@ class MimirFcmService : FirebaseMessagingService() {
         val type = data["type"] ?: return
 
         if (type == "callOffer") {
-            // Sprint #12: gelen arama — yüksek öncelikli bildirim, kilit ekranda çal.
-            // SignalR çoğu zaman zaten event'i app'e taşır; FCM sadece app dead durumda
-            // cihazi uyandirir. Notification'a tap'la app açılır, IncomingCall state otomatik
-            // CallScreen'i tetikler.
+            // FCM bildirimi sadece app DEAD durumunda anlamlı — uygulama açıksa SignalR
+            // IncomingCall event'i zaten CallScreen'i tetikler, çift uyarı olmaz.
             val callerUserId = data["callerUserId"] ?: return
             val callerUsername = data["callerUsername"] ?: ""
-            Notifications.showIncomingCall(applicationContext, callerUserId, callerUsername)
+            val callState = com.aykutcincik.mimir.call.CallManager.state.value
+            val isAlreadyHandling = callState is com.aykutcincik.mimir.call.CallManager.CallState.Incoming ||
+                    callState is com.aykutcincik.mimir.call.CallManager.CallState.Connecting ||
+                    callState is com.aykutcincik.mimir.call.CallManager.CallState.Connected
+            if (!isAlreadyHandling) {
+                Notifications.showIncomingCall(applicationContext, callerUserId, callerUsername)
+            }
             return
         }
 

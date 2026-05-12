@@ -45,6 +45,14 @@ object Notifications {
         }
     }
 
+    private fun incomingCallNotifId(callerUserId: String) = callerUserId.hashCode() xor 0x42
+
+    fun cancelIncomingCall(ctx: Context, callerUserId: String) {
+        runCatching {
+            NotificationManagerCompat.from(ctx).cancel(incomingCallNotifId(callerUserId))
+        }
+    }
+
     fun showIncomingCall(ctx: Context, callerUserId: String, callerUsername: String) {
         ensureChannel(ctx)
         val openIntent = Intent(ctx, MainActivity::class.java).apply {
@@ -52,7 +60,7 @@ object Notifications {
             putExtra("incoming_call_from", callerUserId)
         }
         val pi = PendingIntent.getActivity(
-            ctx, callerUserId.hashCode() xor 0x42, openIntent,
+            ctx, incomingCallNotifId(callerUserId), openIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         val notif = NotificationCompat.Builder(ctx, CHANNEL_ID_CALLS)
@@ -66,7 +74,7 @@ object Notifications {
             .setAutoCancel(true)
             .build()
         runCatching {
-            NotificationManagerCompat.from(ctx).notify(callerUserId.hashCode() xor 0x42, notif)
+            NotificationManagerCompat.from(ctx).notify(incomingCallNotifId(callerUserId), notif)
         }
     }
 
