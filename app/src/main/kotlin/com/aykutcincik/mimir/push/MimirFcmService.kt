@@ -23,15 +23,25 @@ class MimirFcmService : FirebaseMessagingService() {
         val type = data["type"] ?: return
 
         if (type == "callOffer") {
-            // FCM bildirimi sadece app DEAD durumunda anlamlı — uygulama açıksa SignalR
-            // IncomingCall event'i zaten CallScreen'i tetikler, çift uyarı olmaz.
             val callerUserId = data["callerUserId"] ?: return
             val callerUsername = data["callerUsername"] ?: ""
+            val sdpOffer = data["sdpOffer"] ?: ""
+
+            // FCM payload'daki SDP offer'ı CallManager'a doğrudan enjekte et —
+            // SignalR connection olmasa bile state Incoming'e geçer, app uyandığında
+            // CallScreen otomatik açılır.
+            if (sdpOffer.isNotBlank()) {
+                com.aykutcincik.mimir.call.CallManager.injectIncomingOffer(
+                    applicationContext, callerUserId, callerUsername, sdpOffer
+                )
+            }
+
+            // Notification — CallManager Incoming/Connecting/Connected ise tekrar gösterme
             val callState = com.aykutcincik.mimir.call.CallManager.state.value
             val isAlreadyHandling = callState is com.aykutcincik.mimir.call.CallManager.CallState.Incoming ||
                     callState is com.aykutcincik.mimir.call.CallManager.CallState.Connecting ||
                     callState is com.aykutcincik.mimir.call.CallManager.CallState.Connected
-            if (!isAlreadyHandling) {
+            if (!isAlreadyHandling || sdpOffer.isBlank()) {
                 Notifications.showIncomingCall(applicationContext, callerUserId, callerUsername)
             }
             return

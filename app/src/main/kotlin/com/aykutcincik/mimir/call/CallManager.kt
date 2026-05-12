@@ -202,6 +202,16 @@ object CallManager {
 
     // ──────────────────── Incoming ────────────────────
 
+    /**
+     * FCM payload üzerinden gelen SDP offer'ı CallManager'a enjekte et.
+     * SignalR connection olmasa bile state Incoming'e geçer (app dead-from-FCM senaryosu).
+     * MimirFcmService callOffer payload handler tarafından çağrılır.
+     */
+    fun injectIncomingOffer(ctx: Context, callerId: String, callerUsername: String, sdpOffer: String) {
+        init(ctx)
+        handleIncomingOffer(callerId, callerUsername, sdpOffer)
+    }
+
     private fun handleIncomingOffer(callerId: String, callerUsername: String, sdpOffer: String) {
         scope.launch {
             mutex.withLock {
