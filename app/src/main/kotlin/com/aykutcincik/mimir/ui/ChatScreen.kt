@@ -22,6 +22,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
@@ -38,13 +40,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
-import com.aykutcincik.mimir.ui.components.BubbleEnter
 import com.aykutcincik.mimir.ui.components.MimirAvatar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -52,11 +54,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aykutcincik.mimir.data.ApiResult
 import com.aykutcincik.mimir.data.MessageDto
-import com.aykutcincik.mimir.data.MessagingApi
 import com.aykutcincik.mimir.realtime.RealtimeClient
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -64,22 +67,32 @@ import kotlinx.coroutines.launch
 
 private const val TYPING_PAUSE_MS = 2500L  // 2.5sn input pause → typing=false
 
+/**
+ * Sprint #14: Conversation-based chat ekranı. DM ve grup için tek render path —
+ * `isGroup` true ise mesaj balonunun üstüne sender username prefix'i, üye sayısı subtitle.
+ * Call button sadece DM'de (peerUserId dolu olduğunda) görünür.
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ChatScreen(
     accessToken: String,
     currentUserId: String,
-    peerUserId: String,
-    peerUsername: String,
-    realtime: RealtimeClient,        // AuthedScaffold'tan paylaşılan tek instance
+    conversationId: String,
+    displayName: String,
+    isGroup: Boolean,
+    realtime: RealtimeClient,
     onBack: () -> Unit,
-    onStartCall: (() -> Unit)? = null,
+    onOpenGroupDetail: (() -> Unit)? = null,
+    onStartCall: ((peerUserId: String) -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     val api = remember(accessToken) { com.aykutcincik.mimir.Apis.messaging(accessToken) }
 
     val messages = remember { mutableStateListOf<MessageDto>() }
     val seenIds = remember { mutableSetOf<String>() }
+    val memberUsernames = remember { mutableStateMapOf<String, String>() }
+    var peerUserId by remember { mutableStateOf<String?>(null) }  // DM için
+
     var input by remember { mutableStateOf("") }
     var sending by remember { mutableStateOf(false) }
     var initialLoading by remember { mutableStateOf(true) }
@@ -92,42 +105,52 @@ fun ChatScreen(
     var lastTypingSent by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
-    // Mesaj action menü state
     var actionFor by remember { mutableStateOf<MessageDto?>(null) }
     var editingMessage by remember { mutableStateOf<MessageDto?>(null) }
     var editText by remember { mutableStateOf("") }
     var deletingMessage by remember { mutableStateOf<MessageDto?>(null) }
 
-    // İlk yükleme + SignalR connect + event collect
-    LaunchedEffect(peerUserId) {
-        // Initial peer presence (REST snapshot)
+    LaunchedEffect(conversationId) {
+        // Conversation detail (members + DM peer presence info)
         scope.launch {
-            val friendsApi = com.aykutcincik.mimir.Apis.friends(accessToken)
-            // Friends list'inde peer presence varsa al
-            val list = friendsApi.listFriends()
-            if (list is com.aykutcincik.mimir.data.ApiResult.Success) {
-                list.value.firstOrNull { it.userId == peerUserId }?.let {
-                    peerOnline = it.isOnline
-                    peerLastSeen = it.lastSeenAt
+            when (val r = api.getConversation(conversationId)) {
+                is ApiResult.Success -> {
+                    memberUsernames.clear()
+                    r.value.members.forEach { memberUsernames[it.userId] = it.username }
+                    if (!isGroup) {
+                        val other = r.value.members.firstOrNull { it.userId != currentUserId }
+                        peerUserId = other?.userId
+                        // DM presence info — Friends API'den
+                        if (peerUserId != null) {
+                            val friendsApi = com.aykutcincik.mimir.Apis.friends(accessToken)
+                            val list = friendsApi.listFriends()
+                            if (list is ApiResult.Success) {
+                                list.value.firstOrNull { it.userId == peerUserId }?.let {
+                                    peerOnline = it.isOnline
+                                    peerLastSeen = it.lastSeenAt
+                                }
+                            }
+                        }
+                    }
                 }
+                else -> { /* detail eksik olursa mesaj listesi yine çalışır */ }
             }
         }
 
-        when (val r = api.messagesWith(peerUserId, limit = 50)) {
+        when (val r = api.listMessages(conversationId, limit = 50)) {
             is ApiResult.Success -> {
                 messages.clear()
                 seenIds.clear()
                 messages.addAll(r.value)
                 seenIds.addAll(r.value.map { it.id })
-                r.value.filter { it.senderId == peerUserId && it.readAt == null }
-                    .forEach { api.markAsRead(it.id) }
+                // Mark this convo read (single horizon, server-side LastReadAt)
+                scope.launch { api.markConversationRead(conversationId) }
             }
             is ApiResult.Error -> errorText = "Mesajlar alınamadı (HTTP ${r.code})"
             is ApiResult.Failure -> errorText = "Bağlantı hatası: ${r.cause.message}"
         }
         initialLoading = false
 
-        // AppRealtime AuthedScaffold tarafından zaten start edildi — sadece event'leri dinle.
         connected = realtime.isConnected
 
         realtime.events.collect { ev ->
@@ -136,50 +159,56 @@ fun ChatScreen(
                 is RealtimeClient.RealtimeEvent.Disconnected -> connected = false
                 is RealtimeClient.RealtimeEvent.Received -> {
                     val m = ev.msg
-                    if ((m.senderId == peerUserId || m.recipientId == peerUserId) && m.id !in seenIds) {
+                    if (m.conversationId == conversationId && m.id !in seenIds) {
                         seenIds.add(m.id)
                         messages.add(m)
-                        if (m.senderId == peerUserId && m.readAt == null) {
-                            scope.launch { api.markAsRead(m.id) }
+                        if (m.senderId != currentUserId) {
+                            scope.launch { api.markConversationRead(conversationId) }
                         }
                     }
                 }
-                is RealtimeClient.RealtimeEvent.Sent -> {
-                    val m = ev.msg
-                    if (m.recipientId == peerUserId && m.id !in seenIds) {
-                        seenIds.add(m.id)
-                        messages.add(m)
+                is RealtimeClient.RealtimeEvent.Edited -> {
+                    if (ev.event.conversationId == conversationId) {
+                        val idx = messages.indexOfFirst { it.id == ev.event.messageId }
+                        if (idx >= 0) messages[idx] = messages[idx].copy(
+                            content = ev.event.content,
+                            editedAt = ev.event.editedAt,
+                        )
                     }
                 }
-                is RealtimeClient.RealtimeEvent.Read -> {
-                    val idx = messages.indexOfFirst { it.id == ev.event.messageId }
-                    if (idx >= 0) messages[idx] = messages[idx].copy(readAt = ev.event.readAt)
-                }
-                is RealtimeClient.RealtimeEvent.Edited -> {
-                    val idx = messages.indexOfFirst { it.id == ev.event.messageId }
-                    if (idx >= 0) messages[idx] = messages[idx].copy(
-                        content = ev.event.content,
-                        editedAt = ev.event.editedAt,
-                    )
-                }
                 is RealtimeClient.RealtimeEvent.Deleted -> {
-                    val idx = messages.indexOfFirst { it.id == ev.event.messageId }
-                    if (idx >= 0) messages.removeAt(idx)
-                    seenIds.remove(ev.event.messageId)
+                    if (ev.event.conversationId == conversationId) {
+                        val idx = messages.indexOfFirst { it.id == ev.event.messageId }
+                        if (idx >= 0) messages.removeAt(idx)
+                        seenIds.remove(ev.event.messageId)
+                    }
                 }
                 is RealtimeClient.RealtimeEvent.Typing -> {
-                    if (ev.event.fromUserId == peerUserId) {
+                    if (ev.event.conversationId == conversationId &&
+                        ev.event.fromUserId != currentUserId) {
                         peerTyping = ev.event.isTyping
                     }
                 }
                 is RealtimeClient.RealtimeEvent.Presence -> {
-                    if (ev.event.userId == peerUserId) {
+                    val pid = peerUserId
+                    if (pid != null && ev.event.userId == pid) {
                         peerOnline = ev.event.online
                         if (ev.event.lastSeenAt != null) peerLastSeen = ev.event.lastSeenAt
                     }
                 }
+                is RealtimeClient.RealtimeEvent.MemberAdded -> {
+                    if (ev.event.conversationId == conversationId) {
+                        memberUsernames[ev.event.member.userId] = ev.event.member.username
+                    }
+                }
+                is RealtimeClient.RealtimeEvent.MemberRemoved -> {
+                    if (ev.event.conversationId == conversationId) {
+                        memberUsernames.remove(ev.event.userId)
+                    }
+                }
+                is RealtimeClient.RealtimeEvent.Renamed,
+                is RealtimeClient.RealtimeEvent.ConversationRead -> {}
                 is RealtimeClient.RealtimeEvent.Error -> {}
-                // Call signaling — CallManager kendi handle ediyor (AuthedScaffold scope)
                 is RealtimeClient.RealtimeEvent.IncomingCall,
                 is RealtimeClient.RealtimeEvent.CallAnswered,
                 is RealtimeClient.RealtimeEvent.IceCandidate,
@@ -191,9 +220,8 @@ fun ChatScreen(
 
     DisposableEffect(realtime) {
         onDispose {
-            // Connection AuthedScaffold sahibi — biz sadece "yazıyor" durumunu temizle.
             scope.launch {
-                if (lastTypingSent) realtime.sendTyping(peerUserId, false)
+                if (lastTypingSent) realtime.sendTyping(conversationId, false)
             }
         }
     }
@@ -202,19 +230,18 @@ fun ChatScreen(
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
     }
 
-    // Typing send debounce
     fun handleInputChange(newValue: String) {
         input = newValue
         val nonEmpty = newValue.isNotBlank()
         if (nonEmpty && !lastTypingSent) {
-            scope.launch { realtime.sendTyping(peerUserId, true) }
+            scope.launch { realtime.sendTyping(conversationId, true) }
             lastTypingSent = true
         }
         typingResetJob?.cancel()
         typingResetJob = scope.launch {
             delay(TYPING_PAUSE_MS)
             if (lastTypingSent) {
-                realtime.sendTyping(peerUserId, false)
+                realtime.sendTyping(conversationId, false)
                 lastTypingSent = false
             }
         }
@@ -225,13 +252,35 @@ fun ChatScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        MimirAvatar(username = peerUsername, size = 36.dp, online = peerOnline)
+                        if (isGroup) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(androidx.compose.foundation.shape.CircleShape)
+                                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    Icons.Default.Group,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(22.dp),
+                                )
+                            }
+                        } else {
+                            MimirAvatar(username = displayName, size = 36.dp, online = peerOnline)
+                        }
                         Spacer(Modifier.size(10.dp))
                         Column {
-                            Text("@$peerUsername", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                text = if (isGroup) displayName else "@$displayName",
+                                style = MaterialTheme.typography.titleMedium,
+                            )
                             val statusLine = when {
                                 !connected -> "bağlanıyor…"
-                                peerTyping -> "yazıyor…"
+                                peerTyping && !isGroup -> "yazıyor…"
+                                peerTyping && isGroup -> "biri yazıyor…"
+                                isGroup -> "${memberUsernames.size} üye"
                                 peerOnline -> "çevrimiçi"
                                 else -> "son görülme: ${com.aykutcincik.mimir.util.PresenceFormat.lastSeenLabel(peerLastSeen)}"
                             }
@@ -250,8 +299,14 @@ fun ChatScreen(
                     }
                 },
                 actions = {
-                    if (onStartCall != null) {
-                        IconButton(onClick = onStartCall) {
+                    if (isGroup && onOpenGroupDetail != null) {
+                        IconButton(onClick = onOpenGroupDetail) {
+                            Icon(Icons.Filled.Info, contentDescription = "Grup bilgisi")
+                        }
+                    }
+                    val pid = peerUserId
+                    if (!isGroup && pid != null && onStartCall != null) {
+                        IconButton(onClick = { onStartCall(pid) }) {
                             Icon(
                                 Icons.Filled.Call,
                                 contentDescription = "Sesli ara",
@@ -287,6 +342,8 @@ fun ChatScreen(
                         MessageBubble(
                             m = m,
                             isMine = m.senderId == currentUserId,
+                            isGroup = isGroup,
+                            senderUsername = memberUsernames[m.senderId],
                             menuOpen = actionFor?.id == m.id,
                             onLongPress = { if (m.senderId == currentUserId) actionFor = m },
                             onDismissMenu = { actionFor = null },
@@ -325,7 +382,7 @@ fun ChatScreen(
                         if (content.isBlank() || sending) return@FilledIconButton
                         sending = true
                         scope.launch {
-                            when (val r = api.sendMessage(peerUserId, content)) {
+                            when (val r = api.sendMessage(conversationId, content)) {
                                 is ApiResult.Success -> {
                                     if (r.value.id !in seenIds) {
                                         seenIds.add(r.value.id)
@@ -333,7 +390,7 @@ fun ChatScreen(
                                     }
                                     input = ""
                                     if (lastTypingSent) {
-                                        realtime.sendTyping(peerUserId, false)
+                                        realtime.sendTyping(conversationId, false)
                                         lastTypingSent = false
                                     }
                                 }
@@ -437,6 +494,8 @@ fun ChatScreen(
 private fun MessageBubble(
     m: MessageDto,
     isMine: Boolean,
+    isGroup: Boolean,
+    senderUsername: String?,
     menuOpen: Boolean,
     onLongPress: () -> Unit,
     onDismissMenu: () -> Unit,
@@ -465,6 +524,13 @@ private fun MessageBubble(
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
                 Column {
+                    if (isGroup && !isMine && senderUsername != null) {
+                        Text(
+                            text = "@$senderUsername",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                     Text(
                         text = m.content,
                         color = fg,
@@ -485,14 +551,6 @@ private fun MessageBubble(
                     DropdownMenuItem(text = { Text("Sil") }, onClick = onDelete)
                 }
             }
-        }
-        if (isMine && m.readAt != null) {
-            Text(
-                text = "okundu",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(end = 8.dp, top = 2.dp),
-            )
         }
     }
 }

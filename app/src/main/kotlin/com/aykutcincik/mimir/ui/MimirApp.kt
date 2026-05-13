@@ -54,11 +54,18 @@ sealed interface Screen {
 enum class AuthTab { Messages, Friends, Requests, Profile }
 
 sealed interface AuthDetail {
-    data class Chat(val peerUserId: String, val peerUsername: String) : AuthDetail
+    /** Sprint #14: conversationId-based. isGroup → header + send paths farklılaşır. */
+    data class Chat(
+        val conversationId: String,
+        val displayName: String,
+        val isGroup: Boolean,
+    ) : AuthDetail
     data object AddFriend : AuthDetail
     data object Admin : AuthDetail
     data object ChangePassword : AuthDetail
     data object Call : AuthDetail   // Sprint #12 — fullscreen call UI (CallManager state'inden render)
+    data object NewGroup : AuthDetail
+    data class GroupDetail(val conversationId: String) : AuthDetail
 }
 
 @Composable
@@ -229,18 +236,23 @@ private fun AuthedScaffold(
     if (detail != null) {
         when (detail) {
             is AuthDetail.Chat -> {
-                val ctx2 = androidx.compose.ui.platform.LocalContext.current
                 ChatScreen(
                     accessToken = state.accessToken,
                     currentUserId = state.userId,
-                    peerUserId = detail.peerUserId,
-                    peerUsername = detail.peerUsername,
-                    realtime = realtime,                     // shared connection
+                    conversationId = detail.conversationId,
+                    displayName = detail.displayName,
+                    isGroup = detail.isGroup,
+                    realtime = realtime,
                     onBack = { onUpdate(state.copy(detail = null)) },
-                    onStartCall = {
-                        CallManager.startOutgoing(detail.peerUserId, detail.peerUsername)
-                        onUpdate(state.copy(detail = AuthDetail.Call))
-                    },
+                    onOpenGroupDetail = if (detail.isGroup) {
+                        { onUpdate(state.copy(detail = AuthDetail.GroupDetail(detail.conversationId))) }
+                    } else null,
+                    onStartCall = if (!detail.isGroup) {
+                        { peerId ->
+                            CallManager.startOutgoing(peerId, detail.displayName)
+                            onUpdate(state.copy(detail = AuthDetail.Call))
+                        }
+                    } else null,
                 )
             }
             AuthDetail.AddFriend -> AddFriendScreen(
@@ -259,6 +271,20 @@ private fun AuthedScaffold(
             )
             AuthDetail.Call -> CallScreen(
                 onClose = { onUpdate(state.copy(detail = null)) },
+            )
+            AuthDetail.NewGroup -> CreateGroupScreen(
+                accessToken = state.accessToken,
+                onBack = { onUpdate(state.copy(detail = null)) },
+                onCreated = { convId, name ->
+                    onUpdate(state.copy(detail = AuthDetail.Chat(convId, name, isGroup = true)))
+                },
+            )
+            is AuthDetail.GroupDetail -> GroupDetailScreen(
+                accessToken = state.accessToken,
+                currentUserId = state.userId,
+                conversationId = detail.conversationId,
+                onBack = { onUpdate(state.copy(detail = AuthDetail.Chat(detail.conversationId, "", true))) },
+                onLeft = { onUpdate(state.copy(detail = null)) },
             )
         }
         return
@@ -287,8 +313,8 @@ private fun AuthedScaffold(
             when (state.tab) {
                 AuthTab.Messages -> ChatListScreen(
                     accessToken = state.accessToken,
-                    onOpenChat = { peerId, peerUsername ->
-                        onUpdate(state.copy(detail = AuthDetail.Chat(peerId, peerUsername)))
+                    onOpenChat = { convId, displayName, isGroup ->
+                        onUpdate(state.copy(detail = AuthDetail.Chat(convId, displayName, isGroup)))
                     },
                     onNewChat = { onUpdate(state.copy(tab = AuthTab.Friends)) },
                 )
@@ -296,8 +322,18 @@ private fun AuthedScaffold(
                     accessToken = state.accessToken,
                     onAddFriend = { onUpdate(state.copy(detail = AuthDetail.AddFriend)) },
                     onOpenChat = { peerId, peerUsername ->
-                        onUpdate(state.copy(detail = AuthDetail.Chat(peerId, peerUsername)))
+                        // DM idempotent — backend zaten varsa onu döner
+                        scope.launch {
+                            val msgApi = Apis.messaging(state.accessToken)
+                            when (val r = msgApi.createDm(peerId)) {
+                                is ApiResult.Success -> onUpdate(
+                                    state.copy(detail = AuthDetail.Chat(r.value.id, peerUsername, isGroup = false))
+                                )
+                                else -> {}
+                            }
+                        }
                     },
+                    onNewGroup = { onUpdate(state.copy(detail = AuthDetail.NewGroup)) },
                 )
                 AuthTab.Requests -> FriendRequestsScreen(accessToken = state.accessToken)
                 AuthTab.Profile -> ProfileTab(

@@ -99,28 +99,106 @@ data class InvitationSummaryDto(
     @SerialName("status") val status: String,
 )
 
-// ─────────────────────── Messaging (Sprint #4) ───────
+// ─────────────────────── Messaging (Sprint #4 → Sprint #14 unified) ───────
 
+/**
+ * ChatList satırı. DM: type="Dm", name=null, otherUserId/otherUsername dolu.
+ * Group: type="Group", name dolu, otherUserId/otherUsername null.
+ */
 @Serializable
 data class ConversationDto(
-    @SerialName("otherUserId") val otherUserId: String,
-    @SerialName("otherUsername") val otherUsername: String,
+    @SerialName("id") val id: String,
+    @SerialName("type") val type: String,                  // "Dm" | "Group"
+    @SerialName("name") val name: String? = null,
+    @SerialName("otherUserId") val otherUserId: String? = null,
+    @SerialName("otherUsername") val otherUsername: String? = null,
+    @SerialName("memberCount") val memberCount: Int = 2,
     @SerialName("lastMessageContent") val lastMessageContent: String? = null,
     @SerialName("lastMessageAt") val lastMessageAt: String? = null,
     @SerialName("lastMessageFromMe") val lastMessageFromMe: Boolean,
     @SerialName("unreadCount") val unreadCount: Int,
-)
+) {
+    val isGroup: Boolean get() = type.equals("Group", ignoreCase = true)
+    val displayName: String get() = name ?: otherUsername ?: "(silinmiş)"
+}
 
 @Serializable
 data class MessageDto(
     @SerialName("id") val id: String,
+    @SerialName("conversationId") val conversationId: String,
     @SerialName("senderId") val senderId: String,
-    @SerialName("recipientId") val recipientId: String,
     @SerialName("content") val content: String,
     @SerialName("createdAt") val createdAt: String,
-    @SerialName("readAt") val readAt: String? = null,
     @SerialName("editedAt") val editedAt: String? = null,
     @SerialName("deletedAt") val deletedAt: String? = null,
+)
+
+@Serializable
+data class ConversationMemberDto(
+    @SerialName("userId") val userId: String,
+    @SerialName("username") val username: String,
+    @SerialName("role") val role: String,                  // "Owner" | "Admin" | "Member"
+    @SerialName("joinedAt") val joinedAt: String,
+    @SerialName("lastReadAt") val lastReadAt: String? = null,
+)
+
+@Serializable
+data class ConversationDetailDto(
+    @SerialName("id") val id: String,
+    @SerialName("type") val type: String,
+    @SerialName("name") val name: String? = null,
+    @SerialName("createdById") val createdById: String,
+    @SerialName("createdAt") val createdAt: String,
+    @SerialName("lastActivityAt") val lastActivityAt: String? = null,
+    @SerialName("members") val members: List<ConversationMemberDto>,
+)
+
+@Serializable
+data class CreateConversationRequest(
+    @SerialName("type") val type: String,                  // "Dm" | "Group"
+    @SerialName("name") val name: String? = null,
+    @SerialName("memberIds") val memberIds: List<String>,
+)
+
+@Serializable
+data class CreateConversationResponse(
+    @SerialName("id") val id: String,
+    @SerialName("type") val type: String,
+)
+
+@Serializable
+data class RenameConversationRequest(
+    @SerialName("name") val name: String,
+)
+
+@Serializable
+data class AddMemberRequest(
+    @SerialName("userId") val userId: String,
+)
+
+@Serializable
+data class ConversationReadEvent(
+    @SerialName("conversationId") val conversationId: String,
+    @SerialName("userId") val userId: String,
+    @SerialName("lastReadAt") val lastReadAt: String,
+)
+
+@Serializable
+data class ConversationMemberAddedEvent(
+    @SerialName("conversationId") val conversationId: String,
+    @SerialName("member") val member: ConversationMemberDto,
+)
+
+@Serializable
+data class ConversationMemberRemovedEvent(
+    @SerialName("conversationId") val conversationId: String,
+    @SerialName("userId") val userId: String,
+)
+
+@Serializable
+data class ConversationRenamedEvent(
+    @SerialName("conversationId") val conversationId: String,
+    @SerialName("name") val name: String,
 )
 
 @Serializable
@@ -219,12 +297,6 @@ data class SendMessageRequest(
     @SerialName("content") val content: String,
 )
 
-@Serializable
-data class MessageReadEvent(
-    @SerialName("messageId") val messageId: String,
-    @SerialName("readAt") val readAt: String,
-)
-
 // T-035 — edit / soft delete
 @Serializable
 data class EditMessageRequest(
@@ -234,6 +306,7 @@ data class EditMessageRequest(
 @Serializable
 data class MessageEditedEvent(
     @SerialName("messageId") val messageId: String,
+    @SerialName("conversationId") val conversationId: String,
     @SerialName("content") val content: String,
     @SerialName("editedAt") val editedAt: String,
 )
@@ -241,12 +314,14 @@ data class MessageEditedEvent(
 @Serializable
 data class MessageDeletedEvent(
     @SerialName("messageId") val messageId: String,
+    @SerialName("conversationId") val conversationId: String,
     @SerialName("deletedAt") val deletedAt: String,
 )
 
-// T-033 — typing
+// T-033 — typing (Sprint #14: conversation-scoped)
 @Serializable
 data class TypingEvent(
+    @SerialName("conversationId") val conversationId: String,
     @SerialName("fromUserId") val fromUserId: String,
     @SerialName("isTyping") val isTyping: Boolean,
 )

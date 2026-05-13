@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
@@ -57,7 +58,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun ChatListScreen(
     accessToken: String,
-    onOpenChat: (peerId: String, peerUsername: String) -> Unit,
+    onOpenChat: (conversationId: String, displayName: String, isGroup: Boolean) -> Unit,
     onNewChat: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -75,7 +76,7 @@ fun ChatListScreen(
             val q = searchQuery.trim().lowercase()
             if (q.isBlank()) items.toList()
             else items.filter {
-                it.otherUsername.lowercase().contains(q) ||
+                it.displayName.lowercase().contains(q) ||
                 (it.lastMessageContent?.lowercase()?.contains(q) == true)
             }
         }
@@ -175,11 +176,11 @@ fun ChatListScreen(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                itemsIndexed(filtered, key = { _, it -> it.otherUserId }) { idx, c ->
+                itemsIndexed(filtered, key = { _, it -> it.id }) { idx, c ->
                     AnimatedListItem(visible = mounted.value, delayMillis = (idx * 30).coerceAtMost(300)) {
                         ConversationCard(
                             c = c,
-                            onClick = { onOpenChat(c.otherUserId, c.otherUsername) },
+                            onClick = { onOpenChat(c.id, c.displayName, c.isGroup) },
                         )
                     }
                 }
@@ -202,11 +203,28 @@ private fun ConversationCard(c: ConversationDto, onClick: () -> Unit) {
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            MimirAvatar(username = c.otherUsername, size = 48.dp)
+            if (c.isGroup) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.secondaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Default.Group,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(28.dp),
+                    )
+                }
+            } else {
+                MimirAvatar(username = c.displayName, size = 48.dp)
+            }
             Spacer(Modifier.size(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "@${c.otherUsername}",
+                    text = if (c.isGroup) c.displayName else "@${c.displayName}",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
@@ -220,6 +238,13 @@ private fun ConversationCard(c: ConversationDto, onClick: () -> Unit) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (c.isGroup) {
+                    Text(
+                        text = "${c.memberCount} üye",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             if (c.unreadCount > 0) {
                 Spacer(Modifier.size(8.dp))

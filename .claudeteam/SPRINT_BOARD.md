@@ -5,9 +5,35 @@
 
 ## Aktif Sprint
 
-- **Sprint:** #14 (planlanacak)
-- **Başlangıç:** —
-- **Sprint hedefi:** Sprint #13 kapanışı sonrası belirlenecek
+- **Sprint:** #14 — **Group Chat MVP (v1.0.0)**
+- **Başlangıç:** 2026-05-13
+- **Sprint hedefi:** Unified Conversation modeli — DM ve grup tek mesaj/endpoint setinde (ADR-022). GetStream/stream-chat-android baseline (Apache 2.0).
+
+| İş | Durum |
+|---|---|
+| Spike — GetStream `stream-chat-android-compose-sample` pattern analizi (2-step wizard, `messaging` channel) | ✅ |
+| Plan + paydaş onayı (max 50 üye, group voice call yok, avatar yok) | ✅ |
+| Backend: `Conversation` + `ConversationMember` entities + EF config | ✅ |
+| Backend: `AddConversations` migration + DM çift → DM Conversation backfill (DO block) | ✅ |
+| Backend: `ConversationsController` (list, detail, create, rename, addMember, removeMember, read) | ✅ |
+| Backend: `MessagesController` refit — `{convId}` path + tek-yol broadcast | ✅ |
+| Backend: `DmHub` `SendMessage(convId)` + auto-join `conv-{id}` + MemberAdded/Renamed events | ✅ |
+| Backend: `IPushDispatcher` payload'a `conversationId` (FCM → ChatScreen deep-link hazırlığı) | ✅ |
+| Mobile: `ConversationDto` + `MessageDto` shape update + yeni event modelleri | ✅ |
+| Mobile: `MessagingApi` conversation CRUD + message refit | ✅ |
+| Mobile: `RealtimeClient` conversation-scoped event + `SendMessage(convId)` invoke | ✅ |
+| Mobile: `ChatListScreen` unified (DM + Group, group icon + üye sayısı) | ✅ |
+| Mobile: `ChatScreen` `conversationId`-based + group'ta sender username prefix | ✅ |
+| Mobile: `CreateGroupScreen` 2-step wizard (SELECT_FRIENDS → ENTER_NAME) | ✅ |
+| Mobile: `GroupDetailScreen` (üyeler, rename, ekle/çıkar, ayrıl) | ✅ |
+| Mobile: FCM `Notifications.showNewMessage(conversationId, ...)` | ✅ |
+| ADR-022 + SPRINT_BOARD update | ✅ |
+| WIP — E2E test: DM regression + group create + multi-user broadcast + member ops | 🟡 |
+| Push v1.0.0 (versionCode 19, versionName "1.0.0") + force-update sürdür | 🟡 |
+
+**Açık riskler:**
+- Migration prod'da: backup zorunlu, mesaj kaybı olursa rollback DM-only
+- Eski APK'lar (`0.9.2`) yeni endpoint'leri tanımaz → force-update zaten aktif (`MIN_APP_VERSION_ANDROID=1.0.0`'a çıkacak)
 
 ---
 

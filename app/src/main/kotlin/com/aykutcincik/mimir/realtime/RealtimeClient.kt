@@ -3,12 +3,15 @@ package com.aykutcincik.mimir.realtime
 import android.util.Log
 import com.aykutcincik.mimir.data.CallAnsweredEvent
 import com.aykutcincik.mimir.data.CallSimpleEvent
+import com.aykutcincik.mimir.data.ConversationMemberAddedEvent
+import com.aykutcincik.mimir.data.ConversationMemberRemovedEvent
+import com.aykutcincik.mimir.data.ConversationReadEvent
+import com.aykutcincik.mimir.data.ConversationRenamedEvent
 import com.aykutcincik.mimir.data.IceCandidateEvent
 import com.aykutcincik.mimir.data.IncomingCallEvent
 import com.aykutcincik.mimir.data.MessageDeletedEvent
 import com.aykutcincik.mimir.data.MessageDto
 import com.aykutcincik.mimir.data.MessageEditedEvent
-import com.aykutcincik.mimir.data.MessageReadEvent
 import com.aykutcincik.mimir.data.MimirApi
 import com.aykutcincik.mimir.data.PresenceChangedEvent
 import com.aykutcincik.mimir.data.TypingEvent
@@ -40,12 +43,15 @@ class RealtimeClient(
 
     sealed interface RealtimeEvent {
         data class Received(val msg: MessageDto) : RealtimeEvent
-        data class Sent(val msg: MessageDto) : RealtimeEvent
-        data class Read(val event: MessageReadEvent) : RealtimeEvent
         data class Edited(val event: MessageEditedEvent) : RealtimeEvent
         data class Deleted(val event: MessageDeletedEvent) : RealtimeEvent
         data class Typing(val event: TypingEvent) : RealtimeEvent
         data class Presence(val event: PresenceChangedEvent) : RealtimeEvent
+        // Sprint #14 — conversation events
+        data class ConversationRead(val event: ConversationReadEvent) : RealtimeEvent
+        data class MemberAdded(val event: ConversationMemberAddedEvent) : RealtimeEvent
+        data class MemberRemoved(val event: ConversationMemberRemovedEvent) : RealtimeEvent
+        data class Renamed(val event: ConversationRenamedEvent) : RealtimeEvent
         // Sprint #12 voice call signaling
         data class IncomingCall(val event: IncomingCallEvent) : RealtimeEvent
         data class CallAnswered(val event: CallAnsweredEvent) : RealtimeEvent
@@ -73,14 +79,6 @@ class RealtimeClient(
             _events.tryEmit(RealtimeEvent.Received(dto))
         }, MessageDto::class.java)
 
-        conn.on("MessageSent", { dto ->
-            _events.tryEmit(RealtimeEvent.Sent(dto))
-        }, MessageDto::class.java)
-
-        conn.on("MessageRead", { ev ->
-            _events.tryEmit(RealtimeEvent.Read(ev))
-        }, MessageReadEvent::class.java)
-
         conn.on("MessageEdited", { ev ->
             _events.tryEmit(RealtimeEvent.Edited(ev))
         }, MessageEditedEvent::class.java)
@@ -96,6 +94,23 @@ class RealtimeClient(
         conn.on("PresenceChanged", { ev ->
             _events.tryEmit(RealtimeEvent.Presence(ev))
         }, PresenceChangedEvent::class.java)
+
+        // Sprint #14 — conversation lifecycle events
+        conn.on("ConversationRead", { ev ->
+            _events.tryEmit(RealtimeEvent.ConversationRead(ev))
+        }, ConversationReadEvent::class.java)
+
+        conn.on("ConversationMemberAdded", { ev ->
+            _events.tryEmit(RealtimeEvent.MemberAdded(ev))
+        }, ConversationMemberAddedEvent::class.java)
+
+        conn.on("ConversationMemberRemoved", { ev ->
+            _events.tryEmit(RealtimeEvent.MemberRemoved(ev))
+        }, ConversationMemberRemovedEvent::class.java)
+
+        conn.on("ConversationRenamed", { ev ->
+            _events.tryEmit(RealtimeEvent.Renamed(ev))
+        }, ConversationRenamedEvent::class.java)
 
         // Sprint #12 — call signaling events
         conn.on("IncomingCall", { ev ->
@@ -145,8 +160,19 @@ class RealtimeClient(
     // yoksa lazy ve hiç tetiklenmez. `invoke(Void::class.java, ...)` Single döner;
     // `.blockingGet()` await + exception throw (HubException backend tarafından
     // fırlatılırsa mobile'da yakalanır).
-    suspend fun sendTyping(toUserId: String, isTyping: Boolean) = withContext(Dispatchers.IO) {
-        try { hub?.invoke(Void::class.java, "Typing", toUserId, isTyping)?.blockingGet() } catch (_: Exception) {}
+
+    // Sprint #14 — conversation-scoped real-time
+    suspend fun sendMessage(conversationId: String, plaintext: String) = withContext(Dispatchers.IO) {
+        try { hub?.invoke(Void::class.java, "SendMessage", conversationId, plaintext)?.blockingGet() }
+        catch (e: Exception) { Log.e(TAG, "sendMessage fail: ${e.message}") }
+    }
+
+    suspend fun markConversationRead(conversationId: String) = withContext(Dispatchers.IO) {
+        try { hub?.invoke(Void::class.java, "MarkConversationRead", conversationId)?.blockingGet() } catch (_: Exception) {}
+    }
+
+    suspend fun sendTyping(conversationId: String, isTyping: Boolean) = withContext(Dispatchers.IO) {
+        try { hub?.invoke(Void::class.java, "Typing", conversationId, isTyping)?.blockingGet() } catch (_: Exception) {}
     }
 
     // Sprint #12 — call signaling

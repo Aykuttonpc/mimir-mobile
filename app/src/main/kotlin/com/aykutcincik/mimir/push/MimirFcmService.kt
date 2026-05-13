@@ -49,21 +49,21 @@ class MimirFcmService : FirebaseMessagingService() {
 
         val senderUserId = data["senderUserId"] ?: return
         val senderUsername = data["senderUsername"] ?: ""
+        val conversationId = data["conversationId"] ?: return  // Sprint #14: payload'da
 
         // 1. Hızlı bildirim — username var, içerik henüz yok
-        Notifications.showNewMessage(applicationContext, senderUserId, senderUsername, contentPreview = null)
+        Notifications.showNewMessage(applicationContext, conversationId, senderUsername, contentPreview = null)
 
         // 2. API'den son mesajı çek, bildirimi zenginleştir
         scope.launch {
             val storage = DataStoreTokenStorage(applicationContext)
             val saved = storage.load() ?: return@launch
             val api = Apis.messaging(saved.accessToken)
-            val result = runCatching { api.messagesWith(senderUserId, limit = 1) }.getOrNull()
+            val result = runCatching { api.listMessages(conversationId, limit = 1) }.getOrNull()
             if (result is ApiResult.Success) {
-                // messagesWith kronolojik (eski → yeni) reverse dönüyor; son mesaj listede last()
                 val last = result.value.lastOrNull()?.content
                 if (!last.isNullOrBlank()) {
-                    Notifications.showNewMessage(applicationContext, senderUserId, senderUsername, last)
+                    Notifications.showNewMessage(applicationContext, conversationId, senderUsername, last)
                 }
             }
         }

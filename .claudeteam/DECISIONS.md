@@ -34,6 +34,39 @@
 
 ---
 
+## ADR-022 — Unified Conversation Model (Group Chat MVP)
+
+- **Tarih:** 2026-05-13
+- **Durum:** Kabul edildi
+- **Karar verenler:** Tech Lead, Innovation Architect, Tech Radar Eng, Dev #2 (data), AppSec, PO
+
+**Bağlam:**
+Sprint #4'ten beri DM modeli `Message.SenderId + RecipientId` çifti üzerinde duruyordu — `ConversationDto` runtime'da bu çiftlerden türetiliyordu. Sprint #14 grup sohbeti istedi: aynı kanalda N üye (DM = 2-üyeli özel hal). Mevcut çift bazlı şema grup'a uymuyor.
+
+**Değerlendirilen Seçenekler:**
+1. **Ayrı tablo: DmMessage + GroupMessage** — domain ayrımı net, ama duplicate logic (encrypt, edit, delete, broadcast, push)
+2. **Unified `Conversation` + `ConversationMember` + `Message.ConversationId`** — tek tip mesaj, üye lookup ile authorize, broadcast SignalR group "conv-{id}"
+3. **Matrix room model (Element X)** — Rust SDK overhead, federation kompleksitesi gereksiz
+
+**Karar:** Seçenek 2 — GetStream/stream-chat-android baseline.
+
+**Rationale:**
+- GetStream production-verified (milyonlarca user, Apache 2.0). Sprint #12 WebRTC GetStream baseline başarısının tekrarı.
+- DM = `Conversation(Type=Dm)` + 2 member; Group = `Conversation(Type=Group)` + N member. Tek mesaj tablosu, tek API yüzeyi.
+- Friend gating sadece `Create` üzerinde — üye olduğun konuşmada her şey serbest.
+- Migration: mevcut DM çiftleri (`SenderId,RecipientId`) DO block ile `Conversation` + `ConversationMember`'a backfill. Mesaj kaybı yok.
+- SignalR group `conv-{id}` — connection sırasında üye olduğun tüm conv'lara otomatik join. Broadcast tek noktadan.
+
+**Sonuçlar / Trade-off'lar:**
+- (+) Tek mesaj endpoint set (`/api/messages/{convId}` + `/api/conversations`).
+- (+) Read state per-member (`ConversationMember.LastReadAt`) — group için doğal, DM için de yeterli.
+- (+) Mobile `ChatScreen` tek render path; `isGroup` flag header + sender prefix farkını sağlar.
+- (−) Eski `MessageDto` shape değişti (`RecipientId` → `ConversationId`, `ReadAt` kaldırıldı). Eski APK'lar 426 alır (force-update).
+- (−) Voice call DM-only kalır — group call başka bir sprint'in işi.
+- (Risk) Migration backfill prod'da çalışırken backup şart. Down() rollback DM-only çalışır; group oluştuktan sonra rollback edilmemeli.
+
+---
+
 ## ADR-021 — iOS Hedefi Terk: Android-Only (KMP Refactor Iptal)
 
 - **Tarih:** 2026-05-13

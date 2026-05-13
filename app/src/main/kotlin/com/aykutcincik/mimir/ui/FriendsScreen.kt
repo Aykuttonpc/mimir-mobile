@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.PeopleOutline
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Refresh
@@ -56,6 +57,7 @@ fun FriendsScreen(
     accessToken: String,
     onAddFriend: () -> Unit,
     onOpenChat: (peerId: String, peerUsername: String) -> Unit,
+    onNewGroup: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val api = remember(accessToken) { Apis.friends(accessToken) }
@@ -126,6 +128,9 @@ fun FriendsScreen(
                             Icon(Icons.Default.Close, contentDescription = "Kapat")
                         }
                     } else {
+                        IconButton(onClick = onNewGroup) {
+                            Icon(Icons.Default.GroupAdd, contentDescription = "Yeni grup")
+                        }
                         IconButton(onClick = { searchOpen = true }) {
                             Icon(Icons.Default.Search, contentDescription = "Ara")
                         }

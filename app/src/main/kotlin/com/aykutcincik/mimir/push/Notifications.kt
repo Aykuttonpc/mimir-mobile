@@ -81,9 +81,10 @@ object Notifications {
     // ADR-017: 2-aşamalı bildirim. Title = senderUsername (FCM payload'dan, hızlı),
     // text = mesaj önizlemesi (mobile API'den çekildikten sonra update).
     // İçerik FCM'e gitmediği için Google sadece "Mimir push var" görür, mesajı görmez.
+    // Sprint #14: notification id'si conversationId hash'i; tap → bu conv açılır.
     fun showNewMessage(
         ctx: Context,
-        senderUserId: String,
+        conversationId: String,
         senderUsername: String,
         contentPreview: String? = null,
     ) {
@@ -91,10 +92,10 @@ object Notifications {
 
         val openIntent = Intent(ctx, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            putExtra(EXTRA_OPEN_PEER_USER_ID, senderUserId)
+            putExtra(EXTRA_OPEN_CONVERSATION_ID, conversationId)
         }
         val pi = PendingIntent.getActivity(
-            ctx, senderUserId.hashCode(), openIntent,
+            ctx, conversationId.hashCode(), openIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
@@ -111,11 +112,10 @@ object Notifications {
             .setContentIntent(pi)
             .build()
 
-        // Aynı sender'dan tekrar gelirse aynı id ile üzerine yaz (spam kuyruğu yok).
         runCatching {
-            NotificationManagerCompat.from(ctx).notify(senderUserId.hashCode(), notif)
+            NotificationManagerCompat.from(ctx).notify(conversationId.hashCode(), notif)
         }
     }
 
-    const val EXTRA_OPEN_PEER_USER_ID = "open_peer_user_id"
+    const val EXTRA_OPEN_CONVERSATION_ID = "open_conversation_id"
 }
