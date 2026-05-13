@@ -118,17 +118,21 @@ class CallSession(
 
     fun rejectIncoming() {
         val incoming = _state.value as? State.Incoming ?: return
+        // 1. UI state sync — hemen Ended (network IO beklemeden)
+        endSync("Reddedildi")
+        // 2. Signaling async — peer'a haber ver
         scope.launch {
             runCatching { signalingClient.send(SignalingCommand.REJECT, incoming.peerId, "") }
-            end("Reddedildi")
         }
     }
 
     fun hangup() {
-        val peerId = currentPeerId() ?: run { end("Bitti"); return }
+        val peerId = currentPeerId() ?: run { endSync("Bitti"); return }
+        // 1. UI state sync
+        endSync("Bitti")
+        // 2. Signaling async
         scope.launch {
             runCatching { signalingClient.send(SignalingCommand.END, peerId, "") }
-            end("Bitti")
         }
     }
 
@@ -330,6 +334,23 @@ class CallSession(
         am.isSpeakerphoneOn = true   // Default speakerphone; bluetooth/earpiece switch sonraki sprint
     }
 
+    /**
+     * UI state'i SYNC değiştir, cleanup arkadan async. Hangup butonuna basıldığında
+     * UI hemen "kapandı" göstersin — peer'a END signal göndermek için network I/O
+     * (hub.invoke.blockingGet) state set'i geciktirmesin.
+     */
+    private fun endSync(reason: String) {
+        // Önce state'i değiştir — UI hemen görür
+        _state.value = State.Ended(reason)
+        // Sonra cleanup + Idle transition (async)
+        scope.launch {
+            cleanup()
+            delay(2000)
+            if (_state.value is State.Ended) _state.value = State.Idle
+        }
+    }
+
+    /** Async end — handler'lardan çağrılır (zaten coroutine içinde). */
     private fun end(reason: String) {
         scope.launch {
             cleanup()
