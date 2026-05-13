@@ -195,24 +195,24 @@ private fun AuthedScaffold(
     val friendsApi = remember(state.accessToken) { Apis.friends(state.accessToken) }
     var pendingCount by remember { mutableIntStateOf(0) }
 
-    // TEK RealtimeClient — Authed lifecycle. ChatScreen bunu paylaşır (kendisi başka
-    // connection açmaz). CallManager da bunu kullanır.
+    // TEK RealtimeClient — Authed lifecycle. ChatScreen bunu paylaşır.
     val realtime = remember(state.accessToken) { RealtimeClient(state.accessToken) }
     LaunchedEffect(state.accessToken) {
-        CallManager.init(ctx)
-        CallManager.bindRealtime(realtime, state.userId)
         realtime.start()
+        // CallManager bind sonrası FCM pending offer varsa consume et
+        CallManager.bind(ctx, realtime, state.userId, state.accessToken)
+        CallManager.consumePendingFcmOffer()
     }
     DisposableEffect(state.accessToken) {
         onDispose {
-            // Authed scope kapanırsa (logout/force-update) connection'ı temizle
+            CallManager.unbind()
             scope.launch { realtime.stop() }
         }
     }
     val callState by CallManager.state.collectAsState()
     LaunchedEffect(callState) {
-        // Incoming call → fullscreen call ekranını aç
-        if (callState is CallManager.CallState.Incoming && state.detail != AuthDetail.Call) {
+        if (callState is com.aykutcincik.mimir.call.webrtc.session.CallSession.State.Incoming &&
+            state.detail != AuthDetail.Call) {
             onUpdate(state.copy(detail = AuthDetail.Call))
         }
     }
@@ -238,7 +238,7 @@ private fun AuthedScaffold(
                     realtime = realtime,                     // shared connection
                     onBack = { onUpdate(state.copy(detail = null)) },
                     onStartCall = {
-                        CallManager.startOutgoing(ctx2, detail.peerUserId, detail.peerUsername, state.accessToken)
+                        CallManager.startOutgoing(detail.peerUserId, detail.peerUsername)
                         onUpdate(state.copy(detail = AuthDetail.Call))
                     },
                 )
@@ -258,7 +258,6 @@ private fun AuthedScaffold(
                 onSuccessRequireRelogin = onForceLogout,
             )
             AuthDetail.Call -> CallScreen(
-                accessToken = state.accessToken,
                 onClose = { onUpdate(state.copy(detail = null)) },
             )
         }

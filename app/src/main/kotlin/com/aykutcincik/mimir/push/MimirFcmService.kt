@@ -27,21 +27,19 @@ class MimirFcmService : FirebaseMessagingService() {
             val callerUsername = data["callerUsername"] ?: ""
             val sdpOffer = data["sdpOffer"] ?: ""
 
-            // FCM payload'daki SDP offer'ı CallManager'a doğrudan enjekte et —
-            // SignalR connection olmasa bile state Incoming'e geçer, app uyandığında
-            // CallScreen otomatik açılır.
+            // FCM offer'ı CallManager'a enjekte — bind() öncesi geldiyse pending'de durur,
+            // AuthedScaffold mount edince consumePendingFcmOffer() ile session'a aktarılır.
             if (sdpOffer.isNotBlank()) {
                 com.aykutcincik.mimir.call.CallManager.injectIncomingOffer(
-                    applicationContext, callerUserId, callerUsername, sdpOffer
+                    callerUserId, callerUsername, sdpOffer
                 )
             }
 
-            // Notification — CallManager Incoming/Connecting/Connected ise tekrar gösterme
             val callState = com.aykutcincik.mimir.call.CallManager.state.value
-            val isAlreadyHandling = callState is com.aykutcincik.mimir.call.CallManager.CallState.Incoming ||
-                    callState is com.aykutcincik.mimir.call.CallManager.CallState.Connecting ||
-                    callState is com.aykutcincik.mimir.call.CallManager.CallState.Connected
-            if (!isAlreadyHandling || sdpOffer.isBlank()) {
+            val busy = callState is com.aykutcincik.mimir.call.webrtc.session.CallSession.State.Incoming ||
+                    callState is com.aykutcincik.mimir.call.webrtc.session.CallSession.State.Connecting ||
+                    callState is com.aykutcincik.mimir.call.webrtc.session.CallSession.State.Connected
+            if (!busy || sdpOffer.isBlank()) {
                 Notifications.showIncomingCall(applicationContext, callerUserId, callerUsername)
             }
             return

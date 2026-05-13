@@ -1,5 +1,6 @@
 package com.aykutcincik.mimir.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -23,7 +24,6 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -36,7 +36,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,35 +43,32 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aykutcincik.mimir.call.CallManager
+import com.aykutcincik.mimir.call.webrtc.session.CallSession
 import com.aykutcincik.mimir.ui.components.MimirAvatar
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
- * Tek ekran tüm call state'lerini handle eder — Outgoing/Incoming/Connecting/Connected.
- * CallManager.state'i observe eder, state'e göre UI değiştirir.
- * onClose: Idle veya Ended state'e geçince çağrılır (parent dismisses).
+ * Tek ekran tüm call state'lerini handle eder.
+ * State CallSession.State.Idle → onClose çağrılır (parent dismiss).
  */
 @Composable
-fun CallScreen(accessToken: String, onClose: () -> Unit) {
-    val ctx = LocalContext.current
-    val scope = rememberCoroutineScope()
+fun CallScreen(onClose: () -> Unit) {
     val state by CallManager.state.collectAsState()
 
-    // Idle veya Ended → ekrandan çık (Ended 2sn sonra otomatik Idle'a düşer ama biz beklemeyelim)
     LaunchedEffect(state) {
-        if (state is CallManager.CallState.Idle) onClose()
+        if (state is CallSession.State.Idle) onClose()
     }
-    // Sistem back tuşu — Ended state'inde takılmasın
-    androidx.activity.compose.BackHandler(enabled = state !is CallManager.CallState.Connected) {
+
+    BackHandler(enabled = state !is CallSession.State.Connected) {
         when (state) {
-            is CallManager.CallState.Idle, is CallManager.CallState.Ended -> onClose()
-            is CallManager.CallState.Outgoing, is CallManager.CallState.Connecting -> CallManager.hangup()
-            is CallManager.CallState.Incoming -> CallManager.rejectIncoming()
+            is CallSession.State.Idle, is CallSession.State.Ended -> onClose()
+            is CallSession.State.Outgoing, is CallSession.State.Connecting -> CallManager.hangup()
+            is CallSession.State.Incoming -> CallManager.rejectIncoming()
             else -> {}
         }
     }
@@ -82,44 +78,37 @@ fun CallScreen(accessToken: String, onClose: () -> Unit) {
             MaterialTheme.colorScheme.primary,
             MaterialTheme.colorScheme.tertiary,
             MaterialTheme.colorScheme.background,
-        )
+        ),
     )
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(gradient),
-    ) {
+    Box(modifier = Modifier.fillMaxSize().background(gradient)) {
         when (val s = state) {
-            is CallManager.CallState.Outgoing -> CallContent(
+            is CallSession.State.Outgoing -> Content(
                 title = "@${s.peerUsername}",
                 subtitle = "aranıyor…",
                 username = s.peerUsername,
                 pulsing = true,
-                accessToken = accessToken,
                 showAccept = false,
                 onHangup = { CallManager.hangup() },
             )
-            is CallManager.CallState.Incoming -> CallContent(
+            is CallSession.State.Incoming -> Content(
                 title = "@${s.peerUsername}",
                 subtitle = "geliyor…",
                 username = s.peerUsername,
                 pulsing = true,
-                accessToken = accessToken,
                 showAccept = true,
-                onAccept = { CallManager.acceptIncoming(ctx, accessToken) },
+                onAccept = { CallManager.acceptIncoming() },
                 onHangup = { CallManager.rejectIncoming() },
             )
-            is CallManager.CallState.Connecting -> CallContent(
+            is CallSession.State.Connecting -> Content(
                 title = "@${s.peerUsername}",
                 subtitle = "bağlanıyor…",
                 username = s.peerUsername,
                 pulsing = true,
-                accessToken = accessToken,
                 showAccept = false,
                 onHangup = { CallManager.hangup() },
             )
-            is CallManager.CallState.Connected -> {
+            is CallSession.State.Connected -> {
                 var elapsedMs by remember { mutableLongStateOf(0L) }
                 LaunchedEffect(s.startedAt) {
                     while (true) {
@@ -129,38 +118,35 @@ fun CallScreen(accessToken: String, onClose: () -> Unit) {
                 }
                 val mins = elapsedMs / 60_000
                 val secs = (elapsedMs / 1_000) % 60
-                CallContent(
+                Content(
                     title = "@${s.peerUsername}",
                     subtitle = String.format("%02d:%02d", mins, secs),
                     username = s.peerUsername,
                     pulsing = false,
-                    accessToken = accessToken,
                     showAccept = false,
                     showInCallActions = true,
                     onHangup = { CallManager.hangup() },
                 )
             }
-            is CallManager.CallState.Ended -> CallContent(
+            is CallSession.State.Ended -> Content(
                 title = s.reason,
                 subtitle = "kapandı",
                 username = "?",
                 pulsing = false,
-                accessToken = accessToken,
                 showAccept = false,
                 onHangup = onClose,
             )
-            is CallManager.CallState.Idle -> {}
+            is CallSession.State.Idle -> {}
         }
     }
 }
 
 @Composable
-private fun CallContent(
+private fun Content(
     title: String,
     subtitle: String,
     username: String,
     pulsing: Boolean,
-    accessToken: String,
     showAccept: Boolean,
     showInCallActions: Boolean = false,
     onAccept: (() -> Unit)? = null,
@@ -173,7 +159,6 @@ private fun CallContent(
     ) {
         Spacer(Modifier.height(80.dp))
 
-        // Pulsing avatar
         Box(contentAlignment = Alignment.Center) {
             if (pulsing) {
                 val transition = rememberInfiniteTransition(label = "call-pulse")
@@ -211,7 +196,6 @@ private fun CallContent(
             )
         }
 
-        // Bottom action row
         Row(
             modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
             horizontalArrangement = if (showAccept) Arrangement.SpaceEvenly else Arrangement.Center,
@@ -219,18 +203,17 @@ private fun CallContent(
         ) {
             if (showInCallActions) {
                 var muted by remember { mutableStateOf(false) }
-                CircleActionButton(
+                CircleButton(
                     icon = if (muted) Icons.Filled.MicOff else Icons.Filled.Mic,
                     bg = Color.White.copy(alpha = 0.2f),
                     fg = Color.White,
-                    onClick = {
-                        muted = !muted
-                        CallManager.setMuted(muted)
-                    },
-                )
+                ) {
+                    muted = !muted
+                    CallManager.setMuted(muted)
+                }
             }
 
-            CircleActionButton(
+            CircleButton(
                 icon = Icons.Filled.CallEnd,
                 bg = Color(0xFFE53935),
                 fg = Color.White,
@@ -239,7 +222,7 @@ private fun CallContent(
             )
 
             if (showAccept && onAccept != null) {
-                CircleActionButton(
+                CircleButton(
                     icon = Icons.Filled.Call,
                     bg = Color(0xFF4CAF50),
                     fg = Color.White,
@@ -247,25 +230,16 @@ private fun CallContent(
                     onClick = onAccept,
                 )
             }
-
-            if (showInCallActions) {
-                CircleActionButton(
-                    icon = Icons.Filled.VolumeUp,
-                    bg = Color.White.copy(alpha = 0.2f),
-                    fg = Color.White,
-                    onClick = { /* TODO: speaker toggle */ },
-                )
-            }
         }
     }
 }
 
 @Composable
-private fun CircleActionButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+private fun CircleButton(
+    icon: ImageVector,
     bg: Color,
     fg: Color,
-    size: androidx.compose.ui.unit.Dp = 60.dp,
+    size: Dp = 60.dp,
     onClick: () -> Unit,
 ) {
     IconButton(

@@ -98,7 +98,10 @@
       "Bash(ssh -i ~/.ssh/hetzner_aopc deploy@178.104.198.249 \"ss -ulnp 2>/dev/null | grep -E ':3478|:5349' | head -5\")",
       "Bash('/c/Program Files/Android/Android Studio/jbr/bin/keytool.exe' -genkeypair -v -keystore app/mimir-debug.keystore -storepass mimirdebug -keypass mimirdebug -alias mimirdebug -keyalg RSA -keysize 2048 -validity 10000 -dname 'CN=Mimir Debug,OU=Dev,O=AykutOnPC,L=Eskisehir,C=TR')",
       "Bash(./gradlew :app:assembleDebug)",
-      "Bash(./gradlew :app:compileDebugKotlin)"
+      "Bash(./gradlew :app:compileDebugKotlin)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(cygpath -w /tmp/webrtc-ref)"
     ]
   }
 }
