@@ -101,7 +101,8 @@
       "Bash(./gradlew :app:compileDebugKotlin)",
       "WebSearch",
       "WebFetch(domain:github.com)",
-      "Bash(cygpath -w /tmp/webrtc-ref)"
+      "Bash(cygpath -w /tmp/webrtc-ref)",
+      "Bash(dotnet list *)"
     ]
   }
 }
