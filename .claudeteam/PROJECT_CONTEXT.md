@@ -23,12 +23,16 @@ Aykut'un kapalı, kişisel iletişim ağı. Firebase bağımlılığı kaldırı
 
 ## Başarı Kriterleri
 
-- [ ] Yeni kullanıcı 3-aşama gate'ten geçer (email verify + admin onay) — ADR-010
-- [x] DM gerçek-zamanlı (Sprint #5 SignalR ile event-driven, gecikme <1sn)
+- [x] Yeni kullanıcı 3-aşama gate'ten geçer (email verify + admin onay) — ADR-010
+- [x] DM gerçek-zamanlı (SignalR event-driven, gecikme <1sn)
+- [x] Sesli arama (WebRTC P2P + coturn TURN, ephemeral)
+- [x] Push notifications (FCM signal-only, ADR-017)
+- [x] Presence (online/offline + last-seen, ADR-018)
+- [x] APK direkt distribution + force update mekanizması (ADR-015)
+- [x] CI/CD auto-deploy (GitHub Actions, push → VPS rebuild + healthcheck + rollback)
+- [x] Firebase SDK'larından sadece messaging kalır (ADR-017) — Auth/Firestore/Storage hiç yok
 - [ ] Backend uptime > %99 (mevcut VPS uptime'ı baseline)
-- [ ] Android + iOS native uygulamada ortak codebase (KMP + Compose Multiplatform)
-- [ ] APK direkt distribution + force update mekanizması
-- [x] Firebase SDK'larından %100 ayrılma (Sprint #3 T-019 — tüm Firebase BOM + Picasso silindi)
+- ~~Android + iOS ortak codebase~~ — iOS hedefi terk edildi (ADR-021, Android-only)
 
 ## Kısıtlar
 

@@ -34,6 +34,39 @@
 
 ---
 
+## ADR-021 — iOS Hedefi Terk: Android-Only (KMP Refactor Iptal)
+
+- **Tarih:** 2026-05-13
+- **Durum:** Kabul edildi
+- **Karar verenler:** PO (Aykut), Tech Lead, Innovation Architect
+
+**Bağlam:**
+Sprint #3'te (ADR-004) KMP + Compose Multiplatform yolu seçilmişti — iki platform tek codebase. `:data` modülü iOS için "shared"a refactor edilecekti. Production'da Android sağlam, iOS başlangıç tetiklenmemişti.
+
+PO Aykut iOS hedefini geri çekti — somut sebepler:
+1. **Apple Developer Program $99/yıl** — kapalı/hobi kullanım için pahalı
+2. **Dağıtım imkansız** — App Store inceleme + TestFlight 25-cihaz/yıl sınırı + ad-hoc cert overhead. Android'deki "APK linkini WhatsApp'tan gönder" pattern'i iOS'ta yok
+3. **Kullanıcı dağılımı** — Aykut'un çevresinde iOS kullanıcı sayısı düşük (~100 hedef ağ Android-dominant)
+4. **Geliştirme maliyeti** — macOS + Xcode + APNs `.p8` + Apple cert + KMP `:shared` refactor → minimum 1-2 hafta iş, ROI yok
+
+**Karar:**
+**Android-only odak.** iOS terk edildi (silindi değil, tamamen "out of scope"). KMP refactor iptal. Mevcut Android-native (Kotlin + Jetpack Compose) yapı korunur.
+
+**Sonuçlar / Trade-off'lar:**
+- ✅ Kod karmaşıklığı azalır — `:data` JVM module kalır, KMP `:shared` build complexity yok
+- ✅ Sprint hızı artar — iOS-side hazırlığa zaman gitmez
+- ✅ Mevcut dependency'ler Android-native pattern kullanabilir (Compose, DataStore, SignalR Java client) — KMP-uyumluluk derdi yok
+- ❌ Apple ecosystem kullanıcılar dışlanır — bilinçli kabul edildi
+- 🔄 Geri çevrilebilir: gelecekte istenirse `:data → :shared` refactor + iOS skeleton yapılır. Mevcut kod KMP-friendly pattern'ler (Ktor multiplatform-ready, kotlinx-serialization) kullanıyor.
+
+**ADR-004'ü kısmen geçersiz kılar:** KMP karar gerekçesi (iki platform) artık geçerli değil. ADR-004 status "Kısmen yerine geçen ADR-021 (iOS hedefi düştü, Android Kotlin+Compose tarafı korunur)".
+
+**İlgili dosyalar:**
+- `PROJECT_CONTEXT.md` — iOS başarı kriteri kaldırıldı
+- `SPRINT_BOARD.md` — "iOS başlangıç" sırlanmadan silindi
+
+---
+
 ## ADR-020 — Sprint #13 Stabilization (security audit + cleanup)
 
 - **Tarih:** 2026-05-13
@@ -598,7 +631,7 @@ Kullanıcı kişisel mesajlaşmasını yürütüyor + admin kendisi → çok-cih
 ## ADR-004 — Mobile Cross-Platform: Kotlin Multiplatform + Compose Multiplatform
 
 - **Tarih:** 2026-05-08
-- **Durum:** Kabul edildi
+- **Durum:** Kısmen yerine geçen ADR-021 (iOS hedefi düştü; Kotlin + Compose Android tarafı korunur, KMP `:shared` refactor iptal)
 - **Karar verenler:** Senior Dev #3, Tech Lead, Innovation Architect, PO
 
 **Bağlam:**
