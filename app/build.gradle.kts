@@ -13,8 +13,8 @@ android {
         applicationId = "com.aykutcincik.mimir"
         minSdk = 24
         targetSdk = 34
-        versionCode = 17
-        versionName = "0.9.1"
+        versionCode = 18
+        versionName = "0.9.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

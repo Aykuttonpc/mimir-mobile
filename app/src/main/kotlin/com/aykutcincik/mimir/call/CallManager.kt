@@ -78,6 +78,8 @@ object CallManager {
     fun rejectIncoming() = session?.rejectIncoming()
     fun hangup() = session?.hangup()
     fun setMuted(muted: Boolean) = session?.setMuted(muted)
+    fun setSpeakerphone(on: Boolean) = session?.setSpeakerphone(on)
+    val isSpeakerphoneOn: Boolean get() = session?.isSpeakerphoneOn ?: false
 
     /** FCM `callOffer` payload'ı handler — app dead'ken state machine'i tetikler. */
     fun injectIncomingOffer(callerId: String, callerUsername: String, sdpOffer: String) {

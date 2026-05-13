@@ -22,6 +22,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material3.Icon
@@ -198,7 +200,7 @@ private fun Content(
 
         Row(
             modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
-            horizontalArrangement = if (showAccept) Arrangement.SpaceEvenly else Arrangement.Center,
+            horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (showInCallActions) {
@@ -229,6 +231,19 @@ private fun Content(
                     size = 76.dp,
                     onClick = onAccept,
                 )
+            }
+
+            if (showInCallActions) {
+                // Default speakerphone on (setupAudioRouting'de set ediliyor)
+                var speakerOn by remember { mutableStateOf(CallManager.isSpeakerphoneOn.takeIf { it } ?: true) }
+                CircleButton(
+                    icon = if (speakerOn) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
+                    bg = Color.White.copy(alpha = 0.2f),
+                    fg = Color.White,
+                ) {
+                    speakerOn = !speakerOn
+                    CallManager.setSpeakerphone(speakerOn)
+                }
             }
         }
     }

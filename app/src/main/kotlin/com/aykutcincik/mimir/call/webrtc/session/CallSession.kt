@@ -140,6 +140,19 @@ class CallSession(
         runCatching { localAudioTrack?.setEnabled(!muted) }
     }
 
+    fun setSpeakerphone(on: Boolean) {
+        runCatching {
+            @Suppress("DEPRECATION")
+            context.getSystemService<AudioManager>()?.isSpeakerphoneOn = on
+        }
+    }
+
+    val isSpeakerphoneOn: Boolean
+        get() = runCatching {
+            @Suppress("DEPRECATION")
+            context.getSystemService<AudioManager>()?.isSpeakerphoneOn ?: false
+        }.getOrDefault(false)
+
     /** FCM üzerinden gelen offer'ı manuel inject (app dead'ken). */
     fun injectIncomingOffer(callerId: String, callerUsername: String, sdpOffer: String) {
         if (_state.value !is State.Idle && _state.value !is State.Ended) {
