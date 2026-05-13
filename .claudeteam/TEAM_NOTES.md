@@ -5,6 +5,38 @@
 
 ---
 
+## 🍎 iOS Opsiyonu — Açık Tutulur (ADR-021)
+
+> Aykut iOS hedefini şimdilik geri çekti (ADR-021), ama **gelecek karara karşı disiplin korunur**.
+> Yeni dependency veya pattern eklerken **iOS-ready** olmaya devam ederiz ki refactor kolay olsun.
+
+### Geliştirme Kuralları
+
+- **`:data` modülü saf JVM kalır** — Android-spesifik sınıf, dependency veya `@RequiresApi` İÇERMEZ.
+  - ✅ Allowed: Ktor multiplatform-engine (OkHttp swap olur), kotlinx-serialization, kotlinx-coroutines (core), pure data class
+  - ❌ Forbidden in `:data`: `android.*`, AndroidX, DataStore, WebRTC, Firebase, Compose, anything android-only
+- **Android-spesifik şeyler `:app` modülünde**:
+  - DataStore (DataStoreTokenStorage) → iOS'ta UserDefaults/Keychain'le replace edilir
+  - WebRTC (`io.github.webrtc-sdk:android`) → iOS WebRTC framework
+  - Firebase Messaging → APNs (Apple Push)
+  - Compose UI → CMP iOS canvas (gelecekte) veya native SwiftUI
+- **Yeni pattern eklerken sor:** "Bu kod iOS'ta nasıl görünür?"
+  - Pure Kotlin algoritma → `:data` ya da yeni `:shared`
+  - Platform-specific I/O → expect/actual + `:app` (Android) / `iosApp` (iOS, gelecek)
+- **Avoid:** Reflection (KMP'de zayıf), Java-only library, runtime classloading
+
+### KMP Refactor Hazırlığı (gelecek, opsiyonel)
+
+iOS karara dönüldüğünde tek seferde yapılır:
+1. `:data` → `:shared` rename + `commonMain` + `androidMain` + `iosMain` source set'leri
+2. Ktor engine swap: OkHttp → Darwin (iOS) / OkHttp (Android) — `expect/actual` pattern
+3. Token storage `expect class TokenStorage` — Android DataStore, iOS Keychain implementation
+4. iOS `app/ios/` Xcode project + APNs cert + Apple developer hesabı
+
+Mevcut kod bu refactor'ü minimum direnç ile karşılar.
+
+---
+
 ## Çalışma Tarzı (bu proje özelinde)
 
 - **Karar disiplini:** Her mimari kararı ADR olarak [DECISIONS.md](DECISIONS.md)'a yaz. 2 hafta sonra "neden böyle yaptık" sorusunu doğurabilecek her şey kayıtlı.
