@@ -34,6 +34,95 @@
 
 ---
 
+## ADR-020 — Sprint #13 Stabilization (security audit + cleanup)
+
+- **Tarih:** 2026-05-13
+- **Durum:** Uygulandı
+- **Karar verenler:** AppSec, SecOps, Red Team, Tech Lead, Knowledge Curator
+
+**Bağlam:**
+Sprint #12 (sesli arama) GetStream baseline ile prod-hazır hale geldi. Ara sprint olarak güvenlik denetimi + codebase temizliği + dokümantasyon yenileme; portföye uygun README + eksik ADR'ler yazıldı.
+
+**Bulgular ve düzeltmeler:**
+- FriendsController.ResubmitRequestAsync logical bug (reject sonrası yeniden istek → self-friend potansiyeli) → fix
+- AdminController.Decide → invalid_decision artık 400 (eskiden 500)
+- mimir-mobile .gitignore'a `secrets/`, `*.keystore`, `.env*` eklendi (debug keystore explicit istisna)
+- AndroidManifest `usesCleartextTraffic="false"` explicit (Android 9+ default false, disiplin için)
+- Ölü kod: HomeScreen.kt + MeScreen.kt silindi (bottom nav refactor sonrası unused)
+- Program.cs eski TODO açıklayıcı yoruma çevrildi
+
+**Sağlam alanlar (rapor):**
+AES-256-GCM crypto, BCrypt 12, JWT HS256 + key validation, refresh token reuse-detection, rate limit, friendship gating, IDOR koruması, user/email enumeration prevention, WebRTC DTLS-SRTP, coturn HMAC short-lived, docker compose latest yasak + localhost port + RO secret mount.
+
+**Sonuçlar:**
+- OWASP Top 10 critical bulgu yok
+- Sprint #14'e güvenli + temiz baseline
+
+---
+
+## ADR-019 — WebRTC Voice Call: GetStream Baseline + Adapter Pattern (ADR-014'ten Pivot)
+
+- **Tarih:** 2026-05-13
+- **Durum:** Uygulandı (Sprint #12)
+- **Karar verenler:** PO, Tech Lead, Innovation Architect, Senior Dev #1 (Android), SecOps
+
+**Bağlam:**
+Sprint #12'de kendi yazdığımız CallManager 3 sprint debug edildi: scope cancellation race, mutex+I/O deadlock, hangup sync miss. Aykut "patch-and-pray" döngüsünü stop edip açık kaynak referans baz almayı önerdi (NIH terk — anti-pattern 26).
+
+**Değerlendirilen Seçenekler:**
+| Repo | Audio | Self-host signaling | Maintained |
+|---|---|---|---|
+| **GetStream/webrtc-in-jetpack-compose** ⭐ | ✅ | ✅ Ktor WebSocket (adapt edilebilir) | Ocak 2025 |
+| lyh990517/WebRTC-with-Jetpack-Compose | ❌ video only | ❌ Firebase tight | ⚠️ |
+| Telnyx sample | ✅ | ❌ commercial SDK | ✅ |
+
+**Karar:**
+**GetStream/webrtc-in-jetpack-compose** Apache 2.0 baseline. Bizim kullandığımız aynı WebRTC fork (`io.github.webrtc-sdk:android`). Signaling adapter ile bizim SignalR `DmHub.OfferCall/AnswerCall/...`'a bağlandı.
+
+**Mimari:**
+- `StreamPeerConnection` + `StreamPeerConnectionFactory` direkt kopyalandı (Apache 2.0 attribution)
+- `SignalingClient` interface — `MimirSignalingAdapter` implementasyonu RealtimeClient'ı kullanır
+- `CallSession` state machine (Idle/Outgoing/Incoming/Connecting/Connected/Ended)
+- FCM payload'da SDP offer var → app dead'ken bile IncomingCall yakalanır
+- UI: Mimir tema ile yeniden çizilmiş CallScreen (gradient + pulse + 3 buton)
+
+**Sonuçlar / Trade-off'lar:**
+- ✅ Test edilmiş baseline, race condition'lar geçmişte kaldı
+- ✅ Video tracks Sprint #14'te 1-2 günde aktif edilebilir (foundation hazır)
+- ✅ Apache 2.0 attribution README + dosya başlığında
+- ⚠️ Glare resolution (concurrent simultaneous call) basit busy-reject (tie-breaker yok)
+- ⚠️ Call kaydı yok (Aykut'un kararı — ephemeral, ADR-019 prensibi)
+
+---
+
+## ADR-018 — Presence: In-Memory PresenceTracker + SignalR Broadcast
+
+- **Tarih:** 2026-05-09
+- **Durum:** Uygulandı (Sprint #11)
+- **Karar verenler:** Senior Dev #1 (.NET), SecOps, PO
+
+**Bağlam:**
+Sprint #11'de online/offline + last-seen istendi. Mimari karar: persistent storage mı (DB), in-memory mı (single-instance), distributed mı (Redis).
+
+**Değerlendirilen Seçenekler:**
+1. **In-memory `ConcurrentDictionary<Guid, int>`** ⭐ — single-instance MVP'de ideal, sıfır overhead
+2. Redis-distributed — multi-replica'ya geçince mecbur, şu an gereksiz karmaşa
+3. DB persist (User.IsOnline) — write amplification, scaling kötü
+
+**Karar:**
+- `PresenceTracker` singleton — connection count (`AddOrUpdate` ile multi-device safe)
+- `User.LastSeenAt` DB persist (offline kullanıcıların son görülme)
+- DmHub `OnConnectedAsync` → TrackConnect, `transitioned` ise arkadaşlara `PresenceChanged` broadcast
+- `OnDisconnectedAsync` → TrackDisconnect + LastSeenAt update + broadcast
+- `BroadcastPresenceToFriendsAsync` — ADR-016 gating, sadece kabul edilmiş arkadaşlara
+
+**Sonuçlar:**
+- ✅ Multi-device: aynı user 2 cihaz → 2 connection → biri kapansa hala online
+- ✅ Privacy: sadece arkadaşlara presence (kapalı ağ)
+- ⚠️ Multi-replica olunca Redis-distributed'a taşımalı (instance-local tracker farklı verir)
+
+---
+
 ## ADR-017 — FCM Signal-Only Push (ADR-014'ü kısmen geçersiz kılar — Android tarafı)
 
 - **Tarih:** 2026-05-09

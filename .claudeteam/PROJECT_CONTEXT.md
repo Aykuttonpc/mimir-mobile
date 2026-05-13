@@ -4,12 +4,13 @@
 
 - **Proje adı:** **Mimir** (Norse mit. — bilgelik kuyusunun başı; ADR-009)
 - **Sahibi / paydaş:** Aykut (tek paydaş, admin)
-- **Durum:** **WhatsApp-class DM production-ready** (Sprint #2-#3-#4-#5 close 2026-05-09 — backend + mobile + auth + admin + real-time messaging + edit/delete/typing + auto-login + force-update). Sprint #6 iOS + push notification.
-- **Aktif branch:** `kmp-rewrite` (mobile, Sprint #3 itibariyle Kotlin+Compose). Backend `mimir-api` master branch.
-- **URL:** `https://aykutonpc.com/mimir/` — Let's Encrypt cert üzerinden public erişim. Mobile-only, path prefix routing (ADR-007). `/mimir/health` canlı.
+- **Durum:** **Production'da çalışıyor** — DM (SignalR real-time + AES-GCM at-rest) + FCM push + presence (online/last-seen) + ephemeral sesli arama (WebRTC P2P + coturn TURN) + force-update + multi-tema + bottom nav. Stabilization (Sprint #13) tamamlandı.
+- **Aktif branch:** Mobile `master` (Sprint #10'da kmp-rewrite consolidate edildi). Backend `main`.
+- **URL:** `https://aykutonpc.com/mimir/` — Let's Encrypt cert + nginx path prefix routing (ADR-007).
 - **Repolar:**
   - Backend: [mimir-api](https://github.com/Aykuttonpc/mimir-api) — `D:\Projeler\mimir-api`
-  - Mobile: [JavaInstagramClone](https://github.com/Aykuttonpc/JavaInstagramClone) — `D:\Projeler\InstaClone` (Sprint #3'te `mimir-mobile` rename)
+  - Mobile: [mimir-mobile](https://github.com/Aykuttonpc/mimir-mobile) — `D:\Projeler\InstaClone`
+- **CI/CD:** GitHub Actions auto-deploy (push → VPS rebuild + healthcheck + rollback).
 
 ## Amaç
 

@@ -16,3 +16,13 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Secrets / signing — debug keystore explicit istisna (commit'e izin ver)
+.env
+.env.*
+!*.example
+secrets/
+*.jks
+*.keystore
+!app/mimir-debug.keystore   # stable debug signing — repo'da kalır (deterministic build)
+google-services.local.json  # devs için override slot
