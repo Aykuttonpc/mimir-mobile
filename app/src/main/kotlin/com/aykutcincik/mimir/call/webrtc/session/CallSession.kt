@@ -12,9 +12,8 @@
 package com.aykutcincik.mimir.call.webrtc.session
 
 import android.content.Context
-import android.media.AudioManager
-import androidx.core.content.getSystemService
 import com.aykutcincik.mimir.Apis
+import com.aykutcincik.mimir.call.webrtc.audio.CallAudioManager
 import com.aykutcincik.mimir.call.webrtc.peer.StreamPeerConnection
 import com.aykutcincik.mimir.call.webrtc.peer.StreamPeerConnectionFactory
 import com.aykutcincik.mimir.call.webrtc.peer.StreamPeerType
@@ -65,6 +64,7 @@ class CallSession(
 
     private val logger by taggedLogger("Mimir.CallSession")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val audioManager = CallAudioManager(context)
 
     private val _state = MutableStateFlow<State>(State.Idle)
     val state: StateFlow<State> = _state.asStateFlow()
@@ -141,17 +141,11 @@ class CallSession(
     }
 
     fun setSpeakerphone(on: Boolean) {
-        runCatching {
-            @Suppress("DEPRECATION")
-            context.getSystemService<AudioManager>()?.isSpeakerphoneOn = on
-        }
+        audioManager.setSpeakerphone(on)
     }
 
     val isSpeakerphoneOn: Boolean
-        get() = runCatching {
-            @Suppress("DEPRECATION")
-            context.getSystemService<AudioManager>()?.isSpeakerphoneOn ?: false
-        }.getOrDefault(false)
+        get() = audioManager.isSpeakerphoneOn
 
     /** FCM üzerinden gelen offer'ı manuel inject (app dead'ken). */
     fun injectIncomingOffer(callerId: String, callerUsername: String, sdpOffer: String) {
@@ -176,8 +170,10 @@ class CallSession(
             val pc = createPeer(iceServers, peerId, StreamPeerType.PUBLISHER)
             peerConnection = pc
 
+            // Audio focus + MODE_IN_COMMUNICATION track eklemeden ÖNCE (GetStream sırası).
+            audioManager.start()
             attachLocalAudio(pc)
-            setupAudioRouting()
+            audioManager.setSpeakerphone(true)   // call UI default = speakerphone
 
             val offer = pc.createOffer().getOrThrow()
             pc.setLocalDescription(offer).getOrThrow()
@@ -196,8 +192,10 @@ class CallSession(
             val pc = createPeer(iceServers, peerId, StreamPeerType.SUBSCRIBER)
             peerConnection = pc
 
+            // Audio focus + MODE_IN_COMMUNICATION track eklemeden ÖNCE (GetStream sırası).
+            audioManager.start()
             attachLocalAudio(pc)
-            setupAudioRouting()
+            audioManager.setSpeakerphone(true)   // call UI default = speakerphone
 
             pc.setRemoteDescription(SessionDescription(SessionDescription.Type.OFFER, sdpOffer)).getOrThrow()
             val answer = pc.createAnswer().getOrThrow()
@@ -341,12 +339,6 @@ class CallSession(
         _state.value = State.Connected(pid, uname, System.currentTimeMillis())
     }
 
-    private fun setupAudioRouting() {
-        val am = context.getSystemService<AudioManager>() ?: return
-        am.mode = AudioManager.MODE_IN_COMMUNICATION
-        am.isSpeakerphoneOn = true   // Default speakerphone; bluetooth/earpiece switch sonraki sprint
-    }
-
     /**
      * UI state'i SYNC değiştir, cleanup arkadan async. Hangup butonuna basıldığında
      * UI hemen "kapandı" göstersin — peer'a END signal göndermek için network I/O
@@ -382,12 +374,7 @@ class CallSession(
         audioSource = null
         runCatching { peerConnection?.connection?.close() }
         peerConnection = null
-        runCatching {
-            context.getSystemService<AudioManager>()?.let {
-                it.mode = AudioManager.MODE_NORMAL
-                it.isSpeakerphoneOn = false
-            }
-        }
+        audioManager.stop()
     }
 
     private fun currentPeerId(): String? = when (val s = _state.value) {
