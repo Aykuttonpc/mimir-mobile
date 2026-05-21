@@ -28,12 +28,18 @@
 | Mobile: `GroupDetailScreen` (üyeler, rename, ekle/çıkar, ayrıl) | ✅ |
 | Mobile: FCM `Notifications.showNewMessage(conversationId, ...)` | ✅ |
 | ADR-022 + SPRINT_BOARD update | ✅ |
-| WIP — E2E test: DM regression + group create + multi-user broadcast + member ops | 🟡 |
-| Push v1.0.0 (versionCode 19, versionName "1.0.0") + force-update sürdür | 🟡 |
+| Backend deploy v1.0.0 — migration çalıştı, healthcheck 200 | ✅ |
+| Mobile deploy v1.0.0 — APK build + VPS upload | ✅ |
+| **Fix: voice call "ses yok"** — audio focus + modern device routing (CallAudioManager) | ✅ |
+| Mobile deploy v1.0.1 (voice fix) — versionCode 20 | 🟡 build |
+| WIP — E2E test: DM regression + group + voice call ses | 🟡 |
+| force-update dispatch (MIN_APP_VERSION_ANDROID=1.0.1) | 🟡 |
+
+**Voice "ses yok" root cause (2026-05-13):**
+GetStream/webrtc-in-jetpack-compose portunda audio subsystem (`AudioSwitch`/`AudioManagerAdapter`) tamamen atlanmıştı. Audio focus hiç alınmıyordu → OS WebRTC playout stream'ini route etmiyor. `isSpeakerphoneOn` Android 12+ no-op. Fix: `CallAudioManager` — `AudioFocusRequest` + `setCommunicationDevice()`.
 
 **Açık riskler:**
-- Migration prod'da: backup zorunlu, mesaj kaybı olursa rollback DM-only
-- Eski APK'lar (`0.9.2`) yeni endpoint'leri tanımaz → force-update zaten aktif (`MIN_APP_VERSION_ANDROID=1.0.0`'a çıkacak)
+- Eski APK'lar (`0.9.2`/`1.0.0`) → force-update gerekli. `MIN_APP_VERSION_ANDROID=1.0.1` dispatch bekliyor.
 
 ---
 
