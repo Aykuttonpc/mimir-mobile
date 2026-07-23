@@ -34,6 +34,45 @@
 
 ---
 
+## ADR-023 — Release İmzalama Ayrıştırıldı (public debug key → repo-dışı release keystore)
+
+- **Tarih:** 2026-07-23
+- **Durum:** Kabul edildi
+- **Karar verenler:** Kullanıcı, AppSec, SecOps, Tech Lead
+
+**Bağlam:**
+Release buildType `mimirDebug` signingConfig'ini kullanıyordu (`app/build.gradle.kts`, "geçici, release-signed Sprint #15" notuyla). O keystore `app/mimir-debug.keystore` olarak repo'da ve üç parolası da (`mimirdebug`) build script'inde açık yazılı. Repo public (`Aykuttonpc/mimir-mobile`).
+
+Sonuç: keystore + parola herkese açık olduğu için üçüncü bir taraf **birebir aynı imzayla** APK üretebilir. Android imza kontrolünden geçtiği için bu APK, kullanıcının yüklü Mimir'inin üzerine sorunsuz güncelleme olarak kurulur. "Seamless update" için alınan tasarım kararı, saldırgan için de aynı şekilde çalışıyordu.
+
+Aynı denetimde ikinci bulgu: `javaInstagramClone.jks` (eski repo adından kalma yetim release keystore) Ağustos 2024'ten beri public history'de. Hiçbir build referans etmiyor.
+
+Üçüncü bulgu: `.gitignore`'da satır-sonu yorumu kullanılmış (`!app/mimir-debug.keystore   # ...`). gitignore bu formatı desteklemez, pattern yorumu da kapsar → hem bu negation hem `google-services.local.json` kuralı hiç çalışmıyormuş.
+
+**Değerlendirilen Seçenekler:**
+1. Debug key'i release'de kullanmayı sürdür, repo'yu private yap — sızıntı durur ama dağıtılmış APK'lar zaten o key'le imzalı, geriye dönük çözmez
+2. Release için ayrı keystore, parametreler repo dışında — imza yüzeyi tamamen ayrışır
+3. Play App Signing'e geç — Google upload/signing key ayrımını yönetir, ama şu an Play Store'da değiliz
+
+**Karar:**
+Seçenek 2. Release imzalama parametreleri `signing.properties` (gitignored, repo dışı keystore yolu) üzerinden okunuyor. Dosya yoksa build kırılmıyor; uyarı basıp debug key'e düşüyor — CI ve yeni klonlar bozulmasın diye.
+
+**Rationale:**
+Seçenek 1 dağıtılmış APK'ları kurtarmıyor; anahtar zaten yanmış. Seçenek 3 doğru uzun vadeli hedef ama Play Store'a girmeden uygulanamaz ve bugünkü riski çözmez. Seçenek 2 hem acil riski kapatıyor hem Play App Signing'e geçişte upload key olarak yeniden kullanılabiliyor.
+
+Debug keystore bilerek repo'da kaldı: artık **sadece** debug variant'ta kullanılıyor, güvenlik sınırında değil ve deterministik debug imzası geliştirme akışı için gerçek fayda sağlıyor.
+
+**Sonuçlar / Trade-off'lar:**
+- (+) Release imza anahtarı public yüzeyden tamamen çıktı (4096-bit RSA, `CN=Aykut Cincik`, SHA-256 `ED:9C:F4:A4:…`)
+- (+) `.gitignore` kuralları fiilen çalışır hale geldi (`git check-ignore` ile doğrulandı)
+- (+) Debug geliştirme akışı değişmedi — debug variant hâlâ `mimirDebug`
+- (−) **İmza değişti → mevcut kurulumlar güncelleme kabul etmez.** Test kullanıcıları uygulamayı silip yeniden kurmak zorunda; DataStore'daki JWT de silineceği için yeniden login gerekiyor
+- (−) Yeni klonda `signing.properties` yoksa release build sessizce debug key'e düşer — uyarı basılıyor ama dikkat edilmezse gözden kaçabilir
+- ⚠️ `mimirdebug` anahtarıyla imzalanmış tüm eski APK'lar **güvenilmez** kabul edilmeli
+- ⚠️ Release key değişti → SHA-1 fingerprint de değişti; Firebase Console'da SHA kaydı varsa güncellenmeli
+
+---
+
 ## ADR-022 — Unified Conversation Model (Group Chat MVP)
 
 - **Tarih:** 2026-05-13

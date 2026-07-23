@@ -33,7 +33,29 @@
 | **Fix: voice call "ses yok"** — audio focus + modern device routing (CallAudioManager) | ✅ |
 | Mobile deploy v1.0.1 (voice fix) — versionCode 20 | 🟡 build |
 | WIP — E2E test: DM regression + group + voice call ses | 🟡 |
-| force-update dispatch (MIN_APP_VERSION_ANDROID=1.0.1) | 🟡 |
+| force-update dispatch (MIN_APP_VERSION_ANDROID=1.0.1) | 🔴 **BLOKE** — aşağıya bak |
+
+### 🔴 Güvenlik: release imzalama (ADR-023, 2026-07-23)
+
+Release build'ler public repo'daki debug keystore'uyla imzalanıyordu. Herkes aynı imzayla APK üretip yüklü uygulamanın üzerine güncelleme olarak kurabiliyordu.
+
+| İş | Durum |
+|---|---|
+| Release signingConfig → repo dışı `signing.properties` | ✅ |
+| Release keystore üretimi (4096-bit RSA, repo dışında) | ✅ |
+| `javaInstagramClone.jks` takipten çıkarıldı (yetim dosya) | ✅ |
+| `.gitignore` satır-sonu yorumu bug'ı (kurallar hiç çalışmıyormuş) | ✅ |
+| Doğrulama: `assembleRelease` + `apksigner verify` → yeni cert | ✅ |
+| ADR-023 | ✅ |
+| **git history temizliği + force-push** (filter-repo, yedek alındı) | 🟡 onay bekliyor |
+| Test kullanıcılarına uninstall+reinstall duyurusu | ⬜ |
+| Firebase Console SHA-1 fingerprint güncellemesi | ⬜ |
+| GitHub Support → cached view purge talebi | ⬜ |
+
+**⚠️ force-update dispatch neden bloke:**
+`MIN_APP_VERSION_ANDROID=1.0.1` dispatch'i şu an tetiklenirse kullanıcılar güncellemeye zorlanır, ama yeni APK **farklı anahtarla** imzalı → Android imza uyuşmazlığı nedeniyle kurulumu reddeder. Kullanıcı güncelleyemediği için uygulamada kilitli kalır.
+
+Doğru sıra: önce uninstall+reinstall duyurusu ve yeni APK dağıtımı, **sonra** force-update eşiğini yükselt.
 
 **Voice "ses yok" root cause (2026-05-13):**
 GetStream/webrtc-in-jetpack-compose portunda audio subsystem (`AudioSwitch`/`AudioManagerAdapter`) tamamen atlanmıştı. Audio focus hiç alınmıyordu → OS WebRTC playout stream'ini route etmiyor. `isSpeakerphoneOn` Android 12+ no-op. Fix: `CallAudioManager` — `AudioFocusRequest` + `setCommunicationDevice()`.
