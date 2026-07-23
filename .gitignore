@@ -18,11 +18,17 @@
 local.properties
 
 # Secrets / signing — debug keystore explicit istisna (commit'e izin ver)
+# NOT: gitignore satır-sonu yorumu desteklemez; yorum kendi satırında olmalı,
+# aksi halde pattern yorumu da kapsar ve hiçbir şeyle eşleşmez.
 .env
 .env.*
 !*.example
 secrets/
 *.jks
 *.keystore
-!app/mimir-debug.keystore   # stable debug signing — repo'da kalır (deterministic build)
-google-services.local.json  # devs için override slot
+# stable debug signing — repo'da kalır (deterministic build)
+!app/mimir-debug.keystore
+# release imzalama parametreleri — asla commit edilmez
+signing.properties
+# devs için override slot
+google-services.local.json

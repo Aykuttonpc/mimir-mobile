@@ -1,0 +1,20 @@
+# Release imzalama — bu dosyayi "signing.properties" olarak kopyala ve doldur.
+# signing.properties gitignored'dir, ASLA commit edilmez.
+#
+# Keystore'u repo DISINDA tut. Onerilen yer:
+#   C:/Users/<kullanici>/.android/keystores/mimir-release.jks
+#
+# Yolu DUZ EGIK CIZGI (/) ile yaz. .properties formatinda ters egik cizgi
+# escape karakteridir; "C:\Users\..." sessizce bozulur.
+#
+# Olusturma:
+#   keytool -genkeypair -v -keystore <yol>/mimir-release.jks \
+#     -alias mimir -keyalg RSA -keysize 4096 -validity 10000
+#
+# Bu keystore'u kaybedersen ayni applicationId ile bir daha guncelleme
+# yayinlayamazsin. Sifreli bir yedegini parola yoneticinde/offline sakla.
+
+storeFile=C:/Users/<kullanici>/.android/keystores/mimir-release.jks
+storePassword=
+keyAlias=mimir
+keyPassword=

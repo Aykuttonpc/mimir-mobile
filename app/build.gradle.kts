@@ -1,8 +1,27 @@
+import java.io.File
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.google.services)   // ADR-017: FCM
+}
+
+// Release imzalama parametreleri repo disinda: signing.properties (gitignored).
+// Dosya yoksa build kirilmaz, debug key'e duser — ama o key public repo'da oldugu
+// icin o cikti dagitilamaz.
+val signingProps = Properties().apply {
+    val propsFile = rootProject.file("signing.properties")
+    if (propsFile.exists()) propsFile.inputStream().use { load(it) }
+}
+val hasReleaseSigning = signingProps.getProperty("storeFile") != null
+
+if (!hasReleaseSigning) {
+    logger.warn(
+        "signing.properties yok -> release build DEBUG key ile imzalanacak. " +
+        "O keystore ve parolasi public repo'da; bu ciktiyi DAGITMA."
+    )
 }
 
 android {
@@ -19,15 +38,27 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    // Sabit debug keystore — her build aynı imzayı uretir, APK seamless update
+    // Sabit debug keystore — her build ayni imzayi uretir, APK seamless update
     // (Android signature mismatch ile "uygulama yuklenemedi" hatasi olmaz).
-    // Debug only — release Play Store'a giderse ayri keystore kullanilir.
+    // Parolasi bilerek repo'da: bu key SADECE debug icin, guvenlik sinirinda degil.
     signingConfigs {
         create("mimirDebug") {
             storeFile = file("mimir-debug.keystore")
             storePassword = "mimirdebug"
             keyAlias = "mimirdebug"
             keyPassword = "mimirdebug"
+        }
+
+        if (hasReleaseSigning) {
+            create("release") {
+                // Mutlak yol repo disini gosterir; Project.file() onu modul dizinine
+                // gore cozmeye calisip bozuyor — mutlaksa dogrudan File kullan.
+                val storePath = signingProps.getProperty("storeFile")
+                storeFile = File(storePath).takeIf { it.isAbsolute } ?: rootProject.file(storePath)
+                storePassword = signingProps.getProperty("storePassword")
+                keyAlias = signingProps.getProperty("keyAlias")
+                keyPassword = signingProps.getProperty("keyPassword")
+            }
         }
     }
 
@@ -38,7 +69,9 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("mimirDebug")   // gecici, release-signed Sprint #15
+            signingConfig = signingConfigs.getByName(
+                if (hasReleaseSigning) "release" else "mimirDebug"
+            )
         }
     }
 
